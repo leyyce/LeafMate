@@ -69,16 +69,15 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: space-between;
             min-height: 100vh; /* Ensures the content takes at least the full height of the viewport */
-            overflow: hidden; /* Hide the body overflow to prevent double scrollbars */
+            overflow-x: hidden; /* Hide the horizontal scrollbar */
         }
 
         header {
             background-color: #333;
             color: #fff;
             text-align: left;
-            padding: 1em;
+            padding: 0.1em;
             width: 100%;
             position: fixed;
             top: 0;
@@ -100,8 +99,6 @@
         main {
             padding: 120px 20px 20px; /* Adjusted padding to create space under the header */
             text-align: center;
-            overflow-y: auto; /* Enable scrolling for the main container */
-            max-height: calc(100vh - 120px); /* Adjusted to consider header height */
             flex: 1; /* Take remaining vertical space */
         }
 
