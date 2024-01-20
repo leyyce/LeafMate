@@ -14,7 +14,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include "driver/adc.h"
 #include "bme680.h"
+#include "moisture_sensor.h"
 
 #define LOGO "\
 \n\n Welcome to\n \
@@ -60,6 +62,8 @@ by Leya Wehner and Julian Frank\n"
 #define I2C_SCL_PIN   22
 #define I2C_FREQ      I2C_FREQ_100K
 
+#define MOISTURE_SENSOR_CHANNEL ADC1_CHANNEL_0
+
 static bme680_sensor_t *sensor = 0;
 
 /*
@@ -88,10 +92,12 @@ _Noreturn void user_task(void *pvParameters) {
 
             // get the results and do something with them
             if (bme680_get_results_float(sensor, &values)) {
-                printf("%.3f BME680 Sensor: %.2f °C, %.2f %%, %.2f hPa, %.2f Ohm\n",
+                int moist = moisture_sensor_read(MOISTURE_SENSOR_CHANNEL);
+
+                printf("[%.3f] Temp: %.2f °C, Hum: %.2f %%, Moist: %d %%\n",
                        (double) sdk_system_get_time() * 1e-3,
-                       values.temperature, values.humidity,
-                       values.pressure, values.gas_resistance);
+                       values.temperature, values.humidity, moist);
+                       // values.pressure, values.gas_resistance);
                 bme680_set_ambient_temperature(sensor, (int16_t) values.temperature);
             }
         }
@@ -109,14 +115,14 @@ void bme680_init() {
 
         // Changes the oversampling rates to 4x oversampling for temperature
         // and 2x oversampling for humidity. Pressure measurement is skipped.
-        // bme680_set_oversampling_rates(sensor, osr_16x, osr_16x, osr_16x);
+        bme680_set_oversampling_rates(sensor, osr_4x, osr_none, osr_2x);
 
         // Change the IIR filter size for temperature and pressure to 7.
         bme680_set_filter_size(sensor, iir_size_7);
 
         // Change the heater profile 0 to 200 degree Celcius for 100 ms.
-        bme680_set_heater_profile(sensor, 0, 200, 100);
-        bme680_use_heater_profile(sensor, 0);
+        // bme680_set_heater_profile(sensor, 0, 200, 100);
+        bme680_use_heater_profile(sensor, BME680_HEATER_NOT_USED);
     }
 }
 
@@ -134,6 +140,9 @@ void app_main() {
 
     // Init BME680 sensor
     bme680_init();
+
+    // Init moisture sensor
+    moisture_sensor_init(MOISTURE_SENSOR_CHANNEL);
 
 
     /** -- TASK CREATION --- */
