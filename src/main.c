@@ -14,11 +14,17 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include <esp_http_server.h>
 #include "driver/adc.h"
+#include "esp_event.h"
+#include "esp_wifi.h"
+#include "esp_err.h"
+#include "esp_log.h"
+#include "nvs_flash.h"
 #include "bme680.h"
 #include "moisture_sensor.h"
 
-#define LOGO "\
+#define GREETING "\
 \n\n Welcome to\n \
 ...........................:=*+:............................\n \
 .........................:*#*=*#*:..........................\n \
@@ -64,14 +70,137 @@ by Leya Wehner and Julian Frank\n"
 
 #define MOISTURE_SENSOR_CHANNEL ADC1_CHANNEL_0
 
+#define ESP_WIFI_SSID "Obi LAN Kenobi"
+#define ESP_WIFI_PASS "7woi-va8z-l7ey"
+
+static const char *JSON_DATA =  "{ \n"
+                                "\t\"temperature\": %.1f,\n"
+                                "\t\"humidity\": %.1f,\n"
+                                "\t\"moisture\": %d\n"
+                                "}\n";
+
+extern const char index_html[] asm("_binary_index_html_start");
+
+static const char *WIFI_TAG = "WiFi";
+static const char *WEBSERVER_TAG = "Server";
+
+typedef struct {
+    float temperature;
+    float humidity;
+    int moisture;
+} sensor_data_t;
+
+sensor_data_t sensor_data = {
+    .temperature = 0.f,
+    .humidity = 0.f,
+    .moisture = 0,
+};
+
+bool wifi_established;
+
 static bme680_sensor_t *sensor = 0;
+
+// WiFi stuff
+
+static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data) {
+    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
+        wifi_established = false;
+        ESP_LOGI(WIFI_TAG, "Connecting to the AP!");
+        esp_wifi_connect();
+    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
+        wifi_established = false;
+        ESP_LOGI(WIFI_TAG, "Retrying to connect to the AP!");
+        esp_wifi_connect();
+    } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
+        ip_event_got_ip_t *event = (ip_event_got_ip_t *) event_data;
+        ESP_LOGI(WIFI_TAG, "Got IP:" IPSTR, IP2STR(&(event->ip_info.ip)));
+        wifi_established = true;
+    } else {
+        ESP_LOGI (WIFI_TAG, "Unhandled event (%s) with ID %ld!", event_base, event_id);
+    }
+}
+
+void wifi_init_sta() {
+    esp_netif_init();
+
+    ESP_ERROR_CHECK(esp_event_loop_create_default());
+
+    wifi_init_config_t config = WIFI_INIT_CONFIG_DEFAULT();
+
+    ESP_ERROR_CHECK(esp_wifi_init(&config));
+
+    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &wifi_event_handler, NULL));
+//  ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_LOST_IP, &wifi_event_handler, NULL));
+    wifi_config_t wifi_config = {
+            .sta = {
+                    .ssid = ESP_WIFI_SSID,
+                    .password = ESP_WIFI_PASS,
+            },
+    };
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+    esp_netif_create_default_wifi_sta();
+    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
+    ESP_ERROR_CHECK(esp_wifi_start());
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+// Webserver stuff
+
+esp_err_t get_root_handler(httpd_req_t *req) {
+    ESP_LOGI(WEBSERVER_TAG, "Handling root request");
+    httpd_resp_send(req, index_html, HTTPD_RESP_USE_STRLEN);
+    return ESP_OK;
+}
+
+esp_err_t get_sensor_readout(httpd_req_t *req) {
+    ESP_LOGI(WEBSERVER_TAG, "Handling sensor readout request");
+    httpd_resp_set_hdr(req, "Content-Type", "application/json");
+
+    char buff[strlen(JSON_DATA) + 512];
+
+    sprintf(buff, JSON_DATA, sensor_data.temperature, sensor_data.humidity, sensor_data.moisture);
+
+    httpd_resp_send(req, buff, HTTPD_RESP_USE_STRLEN);
+    return ESP_OK;
+}
+
+httpd_uri_t uri_get_root = {
+        .uri = "/",
+        .method = HTTP_GET,
+        .handler = get_root_handler,
+        .user_ctx = NULL
+};
+
+httpd_uri_t uri_get_sensor_readout = {
+        .uri = "/api/v1/vitality",
+        .method = HTTP_GET,
+        .handler = get_sensor_readout,
+        .user_ctx = NULL
+};
+
+httpd_handle_t start_webserver(void) {
+    ESP_LOGI(WEBSERVER_TAG, "Starting server");
+    /* Generate default configuration */
+    httpd_config_t config = HTTPD_DEFAULT_CONFIG ();
+    /* Empty handle to esp_http_server */
+    httpd_handle_t server = NULL;
+    /* Start the httpd server */
+    if (httpd_start(&server, &config) == ESP_OK) {
+        /* Register URI handlers */
+        httpd_register_uri_handler(server, &uri_get_root);
+        httpd_register_uri_handler(server, &uri_get_sensor_readout);
+    }
+    return server;
+}
+// --------------------------------------------------------------------------------------------------------------------
 
 /*
  * User task that triggers measurements of sensor every second. It uses
  * function *vTaskDelay* to wait for measurement results. Busy wating
  * alternative is shown in comments
  */
-_Noreturn void user_task(void *pvParameters) {
+_Noreturn void update_sensor_data(void *pvParameters) {
     (void) pvParameters;
 
     bme680_values_float_t values;
@@ -92,16 +221,21 @@ _Noreturn void user_task(void *pvParameters) {
 
             // get the results and do something with them
             if (bme680_get_results_float(sensor, &values)) {
-                int moist = moisture_sensor_read(MOISTURE_SENSOR_CHANNEL);
+                int moisture = moisture_sensor_read(MOISTURE_SENSOR_CHANNEL);
 
                 printf("[%.3f] Temp: %.2f °C, Hum: %.2f %%, Moist: %d %%\n",
                        (double) sdk_system_get_time() * 1e-3,
-                       values.temperature, values.humidity, moist);
-                       // values.pressure, values.gas_resistance);
-                bme680_set_ambient_temperature(sensor, (int16_t) values.temperature);
+                       values.temperature, values.humidity, moisture);
+
+                sensor_data.temperature = values.temperature;
+                sensor_data.humidity = values.humidity;
+                sensor_data.moisture = moisture;
+
+                // values.pressure, values.gas_resistance);
+                // bme680_set_ambient_temperature(sensor, (int16_t) values.temperature);
             }
         }
-        // passive waiting until 1 second is over
+        // passive waiting until 60 seconds are over
         xTaskDelayUntil(&last_wakeup, 1000 / portTICK_PERIOD_MS);
     }
 }
@@ -128,7 +262,22 @@ void bme680_init() {
 
 
 void app_main() {
-    puts(LOGO);
+    esp_log_level_set("*", ESP_LOG_INFO);
+
+    puts(GREETING);
+
+    esp_err_t ret = nvs_flash_init();
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        ret = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK(ret);
+
+    wifi_init_sta();
+
+    while (!wifi_established);
+
+    start_webserver();
 
     // Set UART Parameter.
     uart_set_baud(0, 115200);
@@ -151,7 +300,7 @@ void app_main() {
 
     // Create a task that uses the sensor
     if (sensor)
-        xTaskCreate(user_task, "user_task", TASK_STACK_DEPTH, NULL, 2, NULL);
+        xTaskCreate(update_sensor_data, "update_sensor_data", TASK_STACK_DEPTH, NULL, 2, NULL);
     else
         printf("Could not initialize BME680 sensor\n");
 }
