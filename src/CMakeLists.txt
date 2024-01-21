@@ -8,3 +8,4 @@ idf_component_register(
 )
 
 target_add_binary_data(${COMPONENT_TARGET} "web/index.html" TEXT)
+target_add_binary_data(${COMPONENT_TARGET} "web/config.html" TEXT)

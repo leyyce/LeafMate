@@ -181,4 +181,3 @@ size_t spi_transfer_pf(uint8_t bus, uint8_t cs, const uint8_t *mosi, uint8_t *mi
 }
 
 #endif  // ESP_PLATFORM
-

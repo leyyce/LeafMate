@@ -74,14 +74,26 @@ by Leya Wehner and Julian Frank\n"
 #define ESP_WIFI_SSID "Obi LAN Kenobi"
 #define ESP_WIFI_PASS "7woi-va8z-l7ey"
 
-static const char *JSON_DATA =  "{ \n"
-                                "\t\"temperature\": %.1f,\n"
-                                "\t\"light_level\": %d,\n"
-                                "\t\"humidity\": %d,\n"
-                                "\t\"moisture\": %d\n"
-                                "}\n";
+static const char *JSON_SENSOR_DATA = "{ \n"
+                                      "\t\"temperature\": %.1f,\n"
+                                      "\t\"light_level\": %d,\n"
+                                      "\t\"humidity\": %d,\n"
+                                      "\t\"moisture\": %d\n"
+                                      "}\n";
+
+static const char *JSON_RANGE_DATA = "{ \n"
+                                     "\t\"temperature_min\": %d,\n"
+                                     "\t\"temperature_max\": %d,\n"
+                                     "\t\"light_level_min\": %d,\n"
+                                     "\t\"light_level_max\": %d,\n"
+                                     "\t\"humidity_min\": %d,\n"
+                                     "\t\"humidity_max\": %d,\n"
+                                     "\t\"moisture_min\": %d,\n"
+                                     "\t\"moisture_max\": %d\n"
+                                     "}\n";
 
 extern const char index_html[] asm("_binary_index_html_start");
+extern const char config_html[] asm("_binary_config_html_start");
 
 static const char *WIFI_TAG = "WiFi";
 static const char *WEBSERVER_TAG = "Server";
@@ -93,11 +105,39 @@ typedef struct {
     int moisture;
 } sensor_data_t;
 
+typedef struct {
+    int temperature_min;
+    int temperature_max;
+
+    int light_level_min;
+    int light_level_max;
+
+    int humidity_min;
+    int humidity_max;
+
+    int moisture_min;
+    int moisture_max;
+} range_config_t;
+
 sensor_data_t sensor_data = {
-    .temperature = 0.f,
-    .light_level = 0,
-    .humidity = 0,
-    .moisture = 0,
+        .temperature = 0.f,
+        .light_level = 0,
+        .humidity = 0,
+        .moisture = 0,
+};
+
+range_config_t range_config = {
+        .temperature_min = 30,
+        .temperature_max = 38,
+
+        .light_level_min = 800,
+        .light_level_max = 1600,
+
+        .humidity_min = 40,
+        .humidity_max = 60,
+
+        .moisture_min = 40,
+        .moisture_max = 60,
 };
 
 bool wifi_established;
@@ -151,23 +191,68 @@ void wifi_init_sta() {
 // --------------------------------------------------------------------------------------------------------------------
 // Webserver stuff
 
+// Handler functions
+
 esp_err_t get_root_handler(httpd_req_t *req) {
     ESP_LOGI(WEBSERVER_TAG, "Handling root request");
     httpd_resp_send(req, index_html, HTTPD_RESP_USE_STRLEN);
     return ESP_OK;
 }
 
-esp_err_t get_sensor_readout(httpd_req_t *req) {
+esp_err_t get_config_handler(httpd_req_t *req) {
+    ESP_LOGI(WEBSERVER_TAG, "Handling config request");
+    httpd_resp_send(req, config_html, HTTPD_RESP_USE_STRLEN);
+    return ESP_OK;
+}
+
+esp_err_t get_sensor_readout_handler(httpd_req_t *req) {
     ESP_LOGI(WEBSERVER_TAG, "Handling sensor readout request");
     httpd_resp_set_hdr(req, "Content-Type", "application/json");
 
-    char buff[strlen(JSON_DATA) + 512];
+    char buff[strlen(JSON_SENSOR_DATA) + 512];
 
-    sprintf(buff, JSON_DATA, sensor_data.temperature, sensor_data.light_level, sensor_data.humidity, sensor_data.moisture);
+    sprintf(buff, JSON_SENSOR_DATA, sensor_data.temperature, sensor_data.light_level, sensor_data.humidity, sensor_data.moisture);
 
     httpd_resp_send(req, buff, HTTPD_RESP_USE_STRLEN);
     return ESP_OK;
 }
+
+esp_err_t get_range_data_handler(httpd_req_t *req) {
+    ESP_LOGI(WEBSERVER_TAG, "Handling range data request");
+    httpd_resp_set_hdr(req, "Content-Type", "application/json");
+
+    char buff[strlen(JSON_RANGE_DATA) + 512];
+
+    sprintf(buff, JSON_RANGE_DATA,
+            range_config.temperature_min, range_config.temperature_max,
+            range_config.light_level_min, range_config.light_level_max,
+            range_config.humidity_min, range_config.humidity_max,
+            range_config.moisture_min, range_config.humidity_max);
+
+    httpd_resp_send(req, buff, HTTPD_RESP_USE_STRLEN);
+    return ESP_OK;
+}
+
+esp_err_t post_config_temperature_handler(httpd_req_t * req) {
+    return ESP_OK;
+}
+
+esp_err_t post_config_light_level_handler(httpd_req_t * req) {
+    return ESP_OK;
+}
+
+esp_err_t post_config_humidity_handler(httpd_req_t * req) {
+    return ESP_OK;
+}
+
+esp_err_t post_config_moisture_handler(httpd_req_t * req) {
+    return ESP_OK;
+}
+
+// Handler functions end
+
+
+// URI configs
 
 httpd_uri_t uri_get_root = {
         .uri = "/",
@@ -176,12 +261,56 @@ httpd_uri_t uri_get_root = {
         .user_ctx = NULL
 };
 
+httpd_uri_t uri_get_config = {
+        .uri = "/config",
+        .method = HTTP_GET,
+        .handler = get_config_handler,
+        .user_ctx = NULL
+};
+
 httpd_uri_t uri_get_sensor_readout = {
         .uri = "/api/v1/vitality",
         .method = HTTP_GET,
-        .handler = get_sensor_readout,
+        .handler = get_sensor_readout_handler,
         .user_ctx = NULL
 };
+
+httpd_uri_t uri_get_range_data = {
+        .uri = "/api/v1/ranges",
+        .method = HTTP_GET,
+        .handler = get_range_data_handler,
+        .user_ctx = NULL
+};
+
+httpd_uri_t uri_post_config_temperature = {
+        .uri = "/api/v1/config/temperature",
+        .method = HTTP_POST,
+        .handler = post_config_temperature_handler,
+        .user_ctx = NULL
+};
+
+httpd_uri_t uri_post_config_light_level = {
+        .uri = "/api/v1/config/light_level",
+        .method = HTTP_POST,
+        .handler = post_config_light_level_handler,
+        .user_ctx = NULL
+};
+
+httpd_uri_t uri_post_config_humidity_level = {
+        .uri = "/api/v1/config/humidity",
+        .method = HTTP_POST,
+        .handler = post_config_humidity_handler,
+        .user_ctx = NULL
+};
+
+httpd_uri_t uri_post_config_moisture_level = {
+        .uri = "/api/v1/config/moisture",
+        .method = HTTP_POST,
+        .handler = post_config_moisture_handler,
+        .user_ctx = NULL
+};
+
+// URI configs end
 
 httpd_handle_t start_webserver(void) {
     ESP_LOGI(WEBSERVER_TAG, "Starting server");
@@ -193,7 +322,14 @@ httpd_handle_t start_webserver(void) {
     if (httpd_start(&server, &config) == ESP_OK) {
         /* Register URI handlers */
         httpd_register_uri_handler(server, &uri_get_root);
+        httpd_register_uri_handler(server, &uri_get_config);
         httpd_register_uri_handler(server, &uri_get_sensor_readout);
+        httpd_register_uri_handler(server, &uri_get_range_data);
+
+        httpd_register_uri_handler(server, &uri_post_config_temperature);
+        httpd_register_uri_handler(server, &uri_post_config_light_level);
+        httpd_register_uri_handler(server, &uri_post_config_humidity_level);
+        httpd_register_uri_handler(server, &uri_post_config_moisture_level);
     }
     return server;
 }

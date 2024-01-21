@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LeafMate - Config</title>
+    <link rel="stylesheet" href="//code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js" integrity="sha512-v2CJ7UaYy4JwqLDIrZUI/4hqeoQieOmAZNXBeQyjo21dadnwR+8ZaIJVT8EE2iyI61OV8e6M8PP2/4hpQINQ/g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.13.2/jquery-ui.min.js" integrity="sha512-57oZ/vW8ANMjR/KQ6Be9v/+/h6bq9/l3f0Oc7vn6qMqyhvPd1cvKBRWWpzu0QoneImqr2SkmO4MSqU+RpHom3Q==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script>
+        let temperature_min_initial = 0;
+        let temperature_max_initial = 0;
+
+        let light_level_min_initial = 0;
+        let light_level_max_initial = 0;
+
+        let humidity_min_initial = 0;
+        let humidity_max_initial = 0;
+
+        let moisture_min_initial = 0;
+        let moisture_max_initial = 0;
+        function fetchData() {
+            // Replace 'your-api-endpoint' with the actual API endpoint
+            fetch('/api/v1/ranges')
+                .then(response => response.json())
+                .then(data => {
+                    // Update the content on the website
+                    temperature_min_initial = data.temperature_min;
+                    temperature_max_initial = data.temperature_max;
+
+                    light_level_min_initial = data.light_level_min;
+                    light_level_max_initial = data.light_level_max;
+
+                    humidity_min_initial = data.humidity_min;
+                    humidity_max_initial = data.humidity_max;
+
+                    moisture_min_initial = data.moisture_min;
+                    moisture_max_initial = data.moisture_max;
+
+                    $( function() {
+                        $( "#slider-range-temperature" ).slider({
+                            range: true,
+                            min: 0,
+                            max: 100,
+                            values: [ temperature_min_initial, temperature_max_initial ],
+                            slide: function( event, ui ) {
+                                $( "#temperature" ).val(  ui.values[ 0 ] + "°C" + " - " + ui.values[ 1 ] + "°C");
+                            }
+                        });
+                        $( "#temperature" ).val( $( "#slider-range-temperature" ).slider( "values", 0 ) + "°C" +
+                            " - " + $( "#slider-range-temperature" ).slider( "values", 1 ) +"°C");
+                    } );
+                    $( function() {
+                        $( "#slider-range-light_level" ).slider({
+                            range: true,
+                            min: 0,
+                            max: 11000,
+                            values: [ light_level_min_initial, light_level_max_initial ],
+                            step: 100,
+                            slide: function( event, ui ) {
+                                $( "#light_level" ).val(  ui.values[ 0 ] + "lux" + " - " + ui.values[ 1 ] + "lux");
+                            }
+                        });
+                        $( "#light_level" ).val( $( "#slider-range-light_level" ).slider( "values", 0 ) + "lux" +
+                            " - " + $( "#slider-range-light_level" ).slider( "values", 1 ) +"lux");
+                    } );
+                    $( function() {
+                        $( "#slider-range-humidity" ).slider({
+                            range: true,
+                            min: 0,
+                            max: 100,
+                            values: [ humidity_min_initial, humidity_max_initial ],
+                            slide: function( event, ui ) {
+                                $( "#humidity" ).val(  ui.values[ 0 ] + "%" + " - " + ui.values[ 1 ] + "%");
+                            }
+                        });
+                        $( "#humidity" ).val( $( "#slider-range-humidity" ).slider( "values", 0 ) + "%" +
+                            " - " + $( "#slider-range-humidity" ).slider( "values", 1 ) +"%");
+                    } );
+
+                    $( function() {
+                        $( "#slider-range-moisture" ).slider({
+                            range: true,
+                            min: 0,
+                            max: 100,
+                            values: [ moisture_min_initial, moisture_max_initial ],
+                            slide: function( event, ui ) {
+                                $( "#moisture" ).val(  ui.values[ 0 ] + "%" + " - " + ui.values[ 1 ] + "%");
+                            }
+                        });
+                        $( "#moisture" ).val( $( "#slider-range-moisture" ).slider( "values", 0 ) + "%" +
+                            " - " + $( "#slider-range-moisture" ).slider( "values", 1 ) +"%");
+                    } );
+                })
+                .catch(error => {
+                    console.error('Error fetching data:', error);
+                });
+        }
+
+        window.onload = function () {
+            fetchData(); // Initial call
+        };
+    </script>
+</head>
+<body>
+<form>
+
+    <p>
+        <label for="temperature">Ideal Temperature:</label>
+        <input type="text" id="temperature" readonly style="border:0; color:#f6931f; font-weight:bold;">
+    </p>
+    <div id="slider-range-temperature"></div>
+
+    <p>
+        <label for="light_level">Ideal Light Level:</label>
+        <input type="text" id="light_level" readonly style="border:0; color:#f6931f; font-weight:bold;">
+    </p>
+    <div id="slider-range-light_level"></div>
+
+    <p>
+    <p>
+        <label for="humidity">Ideal Humidity:</label>
+        <input type="text" id="humidity" readonly style="border:0; color:#f6931f; font-weight:bold;">
+    </p>
+    <div id="slider-range-humidity"></div>
+
+    <p>
+        <label for="moisture">Ideal Soil Moisture :</label>
+        <input type="text" id="moisture" readonly style="border:0; color:#f6931f; font-weight:bold;">
+    </p>
+    <div id="slider-range-moisture"></div>
+
+
+</form>
+
+</body>
+</html>
