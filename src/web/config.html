@@ -8,41 +8,18 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js" integrity="sha512-v2CJ7UaYy4JwqLDIrZUI/4hqeoQieOmAZNXBeQyjo21dadnwR+8ZaIJVT8EE2iyI61OV8e6M8PP2/4hpQINQ/g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.13.2/jquery-ui.min.js" integrity="sha512-57oZ/vW8ANMjR/KQ6Be9v/+/h6bq9/l3f0Oc7vn6qMqyhvPd1cvKBRWWpzu0QoneImqr2SkmO4MSqU+RpHom3Q==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <script>
-        let temperature_min_initial = 0;
-        let temperature_max_initial = 0;
-
-        let light_level_min_initial = 0;
-        let light_level_max_initial = 0;
-
-        let humidity_min_initial = 0;
-        let humidity_max_initial = 0;
-
-        let moisture_min_initial = 0;
-        let moisture_max_initial = 0;
         function fetchData() {
             // Replace 'your-api-endpoint' with the actual API endpoint
             fetch('/api/v1/ranges')
                 .then(response => response.json())
                 .then(data => {
                     // Update the content on the website
-                    temperature_min_initial = data.temperature_min;
-                    temperature_max_initial = data.temperature_max;
-
-                    light_level_min_initial = data.light_level_min;
-                    light_level_max_initial = data.light_level_max;
-
-                    humidity_min_initial = data.humidity_min;
-                    humidity_max_initial = data.humidity_max;
-
-                    moisture_min_initial = data.moisture_min;
-                    moisture_max_initial = data.moisture_max;
-
                     $( function() {
                         $( "#slider-range-temperature" ).slider({
                             range: true,
                             min: 0,
                             max: 100,
-                            values: [ temperature_min_initial, temperature_max_initial ],
+                            values: [ data.temperature_min, data.temperature_max ],
                             slide: function( event, ui ) {
                                 $( "#temperature" ).val(  ui.values[ 0 ] + "°C" + " - " + ui.values[ 1 ] + "°C");
                             }
@@ -55,7 +32,7 @@
                             range: true,
                             min: 0,
                             max: 11000,
-                            values: [ light_level_min_initial, light_level_max_initial ],
+                            values: [ data.light_level_min, data.light_level_max ],
                             step: 100,
                             slide: function( event, ui ) {
                                 $( "#light_level" ).val(  ui.values[ 0 ] + "lux" + " - " + ui.values[ 1 ] + "lux");
@@ -69,7 +46,7 @@
                             range: true,
                             min: 0,
                             max: 100,
-                            values: [ humidity_min_initial, humidity_max_initial ],
+                            values: [ data.humidity_min, data.humidity_max ],
                             slide: function( event, ui ) {
                                 $( "#humidity" ).val(  ui.values[ 0 ] + "%" + " - " + ui.values[ 1 ] + "%");
                             }
@@ -83,7 +60,7 @@
                             range: true,
                             min: 0,
                             max: 100,
-                            values: [ moisture_min_initial, moisture_max_initial ],
+                            values: [ data.moisture_min, data.moisture_max ],
                             slide: function( event, ui ) {
                                 $( "#moisture" ).val(  ui.values[ 0 ] + "%" + " - " + ui.values[ 1 ] + "%");
                             }
