@@ -22,6 +22,20 @@
                             values: [ data.temperature_min, data.temperature_max ],
                             slide: function( event, ui ) {
                                 $( "#temperature" ).val(  ui.values[ 0 ] + "°C" + " - " + ui.values[ 1 ] + "°C");
+                                $.ajax({
+                                    url: "/api/v1/config/temperature",
+                                    type: 'POST',
+                                    contentType: 'text/plain', // Set the content type to plain text
+                                    data: `${ui.values[ 0 ]}:${ui.values[ 1 ]}`,
+                                    success: function(response) {
+                                        // Handle the success response from the server
+                                        console.log('Success:', response);
+                                    },
+                                    error: function(error) {
+                                        // Handle the error response from the server
+                                        console.error('Error:', error);
+                                    }
+                                });
                             }
                         });
                         $( "#temperature" ).val( $( "#slider-range-temperature" ).slider( "values", 0 ) + "°C" +
@@ -36,6 +50,20 @@
                             step: 100,
                             slide: function( event, ui ) {
                                 $( "#light_level" ).val(  ui.values[ 0 ] + "lux" + " - " + ui.values[ 1 ] + "lux");
+                                $.ajax({
+                                    url: "/api/v1/config/light_level",
+                                    type: 'POST',
+                                    contentType: 'text/plain', // Set the content type to plain text
+                                    data: `${ui.values[ 0 ]}:${ui.values[ 1 ]}`,
+                                    success: function(response) {
+                                        // Handle the success response from the server
+                                        console.log('Success:', response);
+                                    },
+                                    error: function(error) {
+                                        // Handle the error response from the server
+                                        console.error('Error:', error);
+                                    }
+                                });
                             }
                         });
                         $( "#light_level" ).val( $( "#slider-range-light_level" ).slider( "values", 0 ) + "lux" +
@@ -49,6 +77,20 @@
                             values: [ data.humidity_min, data.humidity_max ],
                             slide: function( event, ui ) {
                                 $( "#humidity" ).val(  ui.values[ 0 ] + "%" + " - " + ui.values[ 1 ] + "%");
+                                $.ajax({
+                                    url: "/api/v1/config/humidity",
+                                    type: 'POST',
+                                    contentType: 'text/plain', // Set the content type to plain text
+                                    data: `${ui.values[ 0 ]}:${ui.values[ 1 ]}`,
+                                    success: function(response) {
+                                        // Handle the success response from the server
+                                        console.log('Success:', response);
+                                    },
+                                    error: function(error) {
+                                        // Handle the error response from the server
+                                        console.error('Error:', error);
+                                    }
+                                });
                             }
                         });
                         $( "#humidity" ).val( $( "#slider-range-humidity" ).slider( "values", 0 ) + "%" +
@@ -63,14 +105,32 @@
                             values: [ data.moisture_min, data.moisture_max ],
                             slide: function( event, ui ) {
                                 $( "#moisture" ).val(  ui.values[ 0 ] + "%" + " - " + ui.values[ 1 ] + "%");
+                                $.ajax({
+                                    url: "/api/v1/config/moisture",
+                                    type: 'POST',
+                                    contentType: 'text/plain', // Set the content type to plain text
+                                    data: `${ui.values[ 0 ]}:${ui.values[ 1 ]}`,
+                                    success: function(response) {
+                                        // Handle the success response from the server
+                                        console.log('Success:', response);
+                                    },
+                                    error: function(error) {
+                                        // Handle the error response from the server
+                                        console.error('Error:', error);
+                                    }
+                                });
                             }
+
                         });
                         $( "#moisture" ).val( $( "#slider-range-moisture" ).slider( "values", 0 ) + "%" +
                             " - " + $( "#slider-range-moisture" ).slider( "values", 1 ) +"%");
                     } );
+                    document.getElementById('config').style.display = 'block';
                 })
                 .catch(error => {
                     console.error('Error fetching data:', error);
+                    document.getElementById('error_msg').innerText = `Error fetching data: ${error}`;
+                    document.getElementById('error_msg').style.display = 'block';
                 });
         }
 
@@ -80,8 +140,8 @@
     </script>
 </head>
 <body>
-<form>
-
+<p id="error_msg" style="display: none"></p>
+<form id="config" style="display: none">
     <p>
         <label for="temperature">Ideal Temperature:</label>
         <input type="text" id="temperature" readonly style="border:0; color:#f6931f; font-weight:bold;">

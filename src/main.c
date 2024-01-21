@@ -234,18 +234,150 @@ esp_err_t get_range_data_handler(httpd_req_t *req) {
 }
 
 esp_err_t post_config_temperature_handler(httpd_req_t * req) {
+    ESP_LOGI(WEBSERVER_TAG, "Handling post config temperature request");
+    /* Read the content length of the request */
+    int content_length = req->content_len;
+
+    char buffer[content_length + 1];  // Adjust the buffer size as needed
+
+    printf("Content length: %d\n", content_length);
+
+    /* Check if there's any data to read */
+    if (content_length > 0) {
+        /* Read the body of the POST request */
+        int read_len = httpd_req_recv(req, buffer, sizeof(buffer));
+
+        if (read_len <= 0) {
+            /* Handle error */
+            httpd_resp_send_500(req);
+            return ESP_FAIL;
+        }
+
+        /* Null-terminate the received data */
+        buffer[read_len] = '\0';
+
+        /* Print the received data to the console */
+        ESP_LOGI(WEBSERVER_TAG, "Received data: %s", buffer);
+        char* temp_min_str = strtok(buffer, ":");
+        char* temp_max_str = strtok(NULL, ":");
+
+        range_config.temperature_min = strtol(temp_min_str, NULL, 10);
+        range_config.temperature_max = strtol(temp_max_str, NULL, 10);
+
+        /* Send a response back to the client */
+        httpd_resp_send(req, "Data received successfully", HTTPD_RESP_USE_STRLEN);
+    }
     return ESP_OK;
 }
 
 esp_err_t post_config_light_level_handler(httpd_req_t * req) {
+    ESP_LOGI(WEBSERVER_TAG, "Handling post config light_level request");
+    /* Read the content length of the request */
+    int content_length = req->content_len;
+
+    char buffer[content_length + 1];  // Adjust the buffer size as needed
+
+    printf("Content length: %d\n", content_length);
+
+    /* Check if there's any data to read */
+    if (content_length > 0) {
+        /* Read the body of the POST request */
+        int read_len = httpd_req_recv(req, buffer, sizeof(buffer));
+
+        if (read_len <= 0) {
+            /* Handle error */
+            httpd_resp_send_500(req);
+            return ESP_FAIL;
+        }
+
+        /* Null-terminate the received data */
+        buffer[read_len] = '\0';
+
+        /* Print the received data to the console */
+        ESP_LOGI(WEBSERVER_TAG, "Received data: %s", buffer);
+        char* lght_min_str = strtok(buffer, ":");
+        char* lght_max_str = strtok(NULL, ":");
+
+        range_config.light_level_min = strtol(lght_min_str, NULL, 10);
+        range_config.light_level_max = strtol(lght_max_str, NULL, 10);
+
+        /* Send a response back to the client */
+        httpd_resp_send(req, "Data received successfully", HTTPD_RESP_USE_STRLEN);
+        }
     return ESP_OK;
 }
 
 esp_err_t post_config_humidity_handler(httpd_req_t * req) {
+    ESP_LOGI(WEBSERVER_TAG, "Handling post config humidity request");
+    /* Read the content length of the request */
+    int content_length = req->content_len;
+
+    char buffer[content_length + 1];  // Adjust the buffer size as needed
+
+    printf("Content length: %d\n", content_length);
+
+    /* Check if there's any data to read */
+    if (content_length > 0) {
+        /* Read the body of the POST request */
+        int read_len = httpd_req_recv(req, buffer, sizeof(buffer));
+
+        if (read_len <= 0) {
+            /* Handle error */
+            httpd_resp_send_500(req);
+            return ESP_FAIL;
+        }
+
+        /* Null-terminate the received data */
+        buffer[read_len] = '\0';
+
+        /* Print the received data to the console */
+        ESP_LOGI(WEBSERVER_TAG, "Received data: %s", buffer);
+        char* humid_min_str = strtok(buffer, ":");
+        char* humid_max_str = strtok(NULL, ":");
+
+        range_config.humidity_min = strtol(humid_min_str, NULL, 10);
+        range_config.humidity_max = strtol(humid_max_str, NULL, 10);
+
+        /* Send a response back to the client */
+        httpd_resp_send(req, "Data received successfully", HTTPD_RESP_USE_STRLEN);
+    }
     return ESP_OK;
 }
 
 esp_err_t post_config_moisture_handler(httpd_req_t * req) {
+    ESP_LOGI(WEBSERVER_TAG, "Handling post config moisture request");
+    /* Read the content length of the request */
+    int content_length = req->content_len;
+
+    char buffer[content_length + 1];  // Adjust the buffer size as needed
+
+    printf("Content length: %d\n", content_length);
+
+    /* Check if there's any data to read */
+    if (content_length > 0) {
+        /* Read the body of the POST request */
+        int read_len = httpd_req_recv(req, buffer, sizeof(buffer));
+
+        if (read_len <= 0) {
+            /* Handle error */
+            httpd_resp_send_500(req);
+            return ESP_FAIL;
+        }
+
+        /* Null-terminate the received data */
+        buffer[read_len] = '\0';
+
+        /* Print the received data to the console */
+        ESP_LOGI(WEBSERVER_TAG, "Received data: %s", buffer);
+        char* moist_min_str = strtok(buffer, ":");
+        char* moist_max_str = strtok(NULL, ":");
+
+        range_config.moisture_min = strtol(moist_min_str, NULL, 10);
+        range_config.moisture_max = strtol(moist_max_str, NULL, 10);
+
+        /* Send a response back to the client */
+        httpd_resp_send(req, "Data received successfully", HTTPD_RESP_USE_STRLEN);
+    }
     return ESP_OK;
 }
 
