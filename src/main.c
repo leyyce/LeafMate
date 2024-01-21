@@ -23,6 +23,7 @@
 #include "nvs_flash.h"
 #include "bme680.h"
 #include "moisture_sensor.h"
+#include "tsl2561.h"
 
 #define GREETING "\
 \n\n Welcome to\n \
@@ -75,7 +76,8 @@ by Leya Wehner and Julian Frank\n"
 
 static const char *JSON_DATA =  "{ \n"
                                 "\t\"temperature\": %.1f,\n"
-                                "\t\"humidity\": %.1f,\n"
+                                "\t\"light_level\": %d,\n"
+                                "\t\"humidity\": %d,\n"
                                 "\t\"moisture\": %d\n"
                                 "}\n";
 
@@ -86,13 +88,15 @@ static const char *WEBSERVER_TAG = "Server";
 
 typedef struct {
     float temperature;
-    float humidity;
+    int light_level;
+    int humidity;
     int moisture;
 } sensor_data_t;
 
 sensor_data_t sensor_data = {
     .temperature = 0.f,
-    .humidity = 0.f,
+    .light_level = 0,
+    .humidity = 0,
     .moisture = 0,
 };
 
@@ -159,7 +163,7 @@ esp_err_t get_sensor_readout(httpd_req_t *req) {
 
     char buff[strlen(JSON_DATA) + 512];
 
-    sprintf(buff, JSON_DATA, sensor_data.temperature, sensor_data.humidity, sensor_data.moisture);
+    sprintf(buff, JSON_DATA, sensor_data.temperature, sensor_data.light_level, sensor_data.humidity, sensor_data.moisture);
 
     httpd_resp_send(req, buff, HTTPD_RESP_USE_STRLEN);
     return ESP_OK;
@@ -221,14 +225,16 @@ _Noreturn void update_sensor_data(void *pvParameters) {
 
             // get the results and do something with them
             if (bme680_get_results_float(sensor, &values)) {
+                float lux = tsl2561_read_sensor_value(I2C_BUS);
                 int moisture = moisture_sensor_read(MOISTURE_SENSOR_CHANNEL);
 
-                printf("[%.3f] Temp: %.2f °C, Hum: %.2f %%, Moist: %d %%\n",
+                printf("[%.3f] Temp: %.2f °C, Light: %.2f lux, Hum: %.2f %%, Moist: %d %%\n",
                        (double) sdk_system_get_time() * 1e-3,
-                       values.temperature, values.humidity, moisture);
+                       values.temperature, lux, values.humidity, moisture);
 
                 sensor_data.temperature = values.temperature;
-                sensor_data.humidity = values.humidity;
+                sensor_data.light_level = (int) lux;
+                sensor_data.humidity = (int) values.humidity;
                 sensor_data.moisture = moisture;
 
                 // values.pressure, values.gas_resistance);
@@ -289,6 +295,9 @@ void app_main() {
 
     // Init BME680 sensor
     bme680_init();
+
+    // TSL2561 init
+    tsl2561_sensor_init(I2C_BUS);
 
     // Init moisture sensor
     moisture_sensor_init(MOISTURE_SENSOR_CHANNEL);
