@@ -227,7 +227,7 @@ esp_err_t get_range_data_handler(httpd_req_t *req) {
             range_config.temperature_min, range_config.temperature_max,
             range_config.light_level_min, range_config.light_level_max,
             range_config.humidity_min, range_config.humidity_max,
-            range_config.moisture_min, range_config.humidity_max);
+            range_config.moisture_min, range_config.moisture_max);
 
     httpd_resp_send(req, buff, HTTPD_RESP_USE_STRLEN);
     return ESP_OK;
