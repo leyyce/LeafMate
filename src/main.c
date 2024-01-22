@@ -127,8 +127,8 @@ sensor_data_t sensor_data = {
 };
 
 range_config_t range_config = {
-        .temperature_min = 30,
-        .temperature_max = 38,
+        .temperature_min = 20,
+        .temperature_max = 25,
 
         .light_level_min = 800,
         .light_level_max = 1600,
