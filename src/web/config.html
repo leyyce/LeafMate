@@ -20,8 +20,8 @@
                     $( function() {
                         $( "#slider-range-temperature" ).slider({
                             range: true,
-                            min: 0,
-                            max: 100,
+                            min: -20,
+                            max: 60,
                             values: [ data.temperature_min, data.temperature_max ],
                             slide: function( event, ui ) {
                                 $( "#temperature" ).val(  ui.values[ 0 ] + "°C" + " - " + ui.values[ 1 ] + "°C");
@@ -48,7 +48,7 @@
                         $( "#slider-range-light_level" ).slider({
                             range: true,
                             min: 0,
-                            max: 11000,
+                            max: 20000,
                             values: [ data.light_level_min, data.light_level_max ],
                             step: 100,
                             slide: function( event, ui ) {
