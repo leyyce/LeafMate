@@ -135,17 +135,27 @@
         }
 
         main i {
-            margin-right: 10px;
+            margin-right: 25px;
+            float: left;
         }
 
-        p {
+        main p {
             font-size: 22px;
+            text-align: left;
+            margin-bottom: 10px;
+        }
+
+        main p.value {
+            margin-top: 10px;
+            padding-bottom: 15px;
+            text-align: center;
         }
 
         #countdown {
             font-size: 16px;
             /*font-weight: bold;*/
             margin-bottom: 20px;
+            margin-top: 50px;
         }
 
         button {
@@ -194,11 +204,14 @@
         </nav>
     </header>
     <main>
-        <p><i class="fa-solid fa-temperature-low"></i>Temperature: <span id="temperature">Loading...</span></p>
-        <p><i class="fa-solid fa-sun"></i>Light Level: <span id="light_level">Loading...</span></p>
-        <p><i class="fa-solid fa-wind"></i>Humidity: <span id="humidity">Loading...</span></p>
-        <p><i class="fa-solid fa-seedling"></i>Moisture: <span id="moisture">Loading...</span></p>
-        <br>
+        <p><i class="fa-solid fa-temperature-low"></i>Temperature:</p>
+        <p id="temperature" class="value">Loading...</p>
+        <p><i class="fa-solid fa-sun"></i>Light Level:</p>
+        <p id="light_level" class="value">Loading...</p>
+        <p><i class="fa-solid fa-wind"></i>Humidity:</p>
+        <p id="humidity" class="value">Loading...</p>
+        <p><i class="fa-solid fa-seedling"></i>Moisture:</p>
+        <p id="moisture" class="value">Loading...</p>
         <p id="countdown">Next refresh in: <span id="countdown_time"></span> seconds</p>
         <button onclick="fetchNow()">Refresh now!</button>
     </main>

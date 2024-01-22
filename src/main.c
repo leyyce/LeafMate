@@ -75,7 +75,7 @@ by Leya Wehner and Julian Frank\n"
 #define ESP_WIFI_PASS "7woi-va8z-l7ey"
 
 static const char *JSON_SENSOR_DATA = "{ \n"
-                                      "\t\"temperature\": %.1f,\n"
+                                      "\t\"temperature\": %d,\n"
                                       "\t\"light_level\": %d,\n"
                                       "\t\"humidity\": %d,\n"
                                       "\t\"moisture\": %d\n"
@@ -99,7 +99,7 @@ static const char *WIFI_TAG = "WiFi";
 static const char *WEBSERVER_TAG = "Server";
 
 typedef struct {
-    float temperature;
+    int temperature;
     int light_level;
     int humidity;
     int moisture;
@@ -120,7 +120,7 @@ typedef struct {
 } range_config_t;
 
 sensor_data_t sensor_data = {
-        .temperature = 0.f,
+        .temperature = 0,
         .light_level = 0,
         .humidity = 0,
         .moisture = 0,
@@ -147,6 +147,8 @@ static bme680_sensor_t *sensor = 0;
 // WiFi stuff
 
 static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data) {
+    (void) arg;
+
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
         wifi_established = false;
         ESP_LOGI(WIFI_TAG, "Connecting to the AP!");
@@ -236,7 +238,7 @@ esp_err_t get_range_data_handler(httpd_req_t *req) {
 esp_err_t post_config_temperature_handler(httpd_req_t * req) {
     ESP_LOGI(WEBSERVER_TAG, "Handling post config temperature request");
     /* Read the content length of the request */
-    int content_length = req->content_len;
+    size_t content_length = req->content_len;
 
     char buffer[content_length + 1];  // Adjust the buffer size as needed
 
@@ -273,7 +275,7 @@ esp_err_t post_config_temperature_handler(httpd_req_t * req) {
 esp_err_t post_config_light_level_handler(httpd_req_t * req) {
     ESP_LOGI(WEBSERVER_TAG, "Handling post config light_level request");
     /* Read the content length of the request */
-    int content_length = req->content_len;
+    size_t content_length = req->content_len;
 
     char buffer[content_length + 1];  // Adjust the buffer size as needed
 
@@ -310,7 +312,7 @@ esp_err_t post_config_light_level_handler(httpd_req_t * req) {
 esp_err_t post_config_humidity_handler(httpd_req_t * req) {
     ESP_LOGI(WEBSERVER_TAG, "Handling post config humidity request");
     /* Read the content length of the request */
-    int content_length = req->content_len;
+    size_t content_length = req->content_len;
 
     char buffer[content_length + 1];  // Adjust the buffer size as needed
 
@@ -347,7 +349,7 @@ esp_err_t post_config_humidity_handler(httpd_req_t * req) {
 esp_err_t post_config_moisture_handler(httpd_req_t * req) {
     ESP_LOGI(WEBSERVER_TAG, "Handling post config moisture request");
     /* Read the content length of the request */
-    int content_length = req->content_len;
+    size_t content_length = req->content_len;
 
     char buffer[content_length + 1];  // Adjust the buffer size as needed
 
@@ -500,7 +502,7 @@ _Noreturn void update_sensor_data(void *pvParameters) {
                        (double) sdk_system_get_time() * 1e-3,
                        values.temperature, lux, values.humidity, moisture);
 
-                sensor_data.temperature = values.temperature;
+                sensor_data.temperature = (int) values.temperature;
                 sensor_data.light_level = (int) lux;
                 sensor_data.humidity = (int) values.humidity;
                 sensor_data.moisture = moisture;
