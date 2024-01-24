@@ -17,6 +17,8 @@
 #ifndef LEAFMATE_TSL2561_H
 #define LEAFMATE_TSL2561_H
 
+#include <stdio.h>
+
 void tsl2561_sensor_init(uint8_t bus);
 
 float tsl2561_read_sensor_value(uint8_t bus);

@@ -18,6 +18,7 @@
 #define LEAFMATE_MOISTURE_SENSOR_H
 
 int moisture_sensor_read(adc1_channel_t adc1_channel);
+
 void moisture_sensor_init(adc1_channel_t adc1_channel);
 
 #endif //LEAFMATE_MOISTURE_SENSOR_H

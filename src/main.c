@@ -14,16 +14,20 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include <stdio.h>
+#include <stdbool.h>
+
+#include <driver/adc.h>
 #include <esp_http_server.h>
-#include "driver/adc.h"
-#include "esp_event.h"
-#include "esp_wifi.h"
-#include "esp_err.h"
-#include "esp_log.h"
-#include "nvs_flash.h"
+#include <esp_event.h>
+#include <esp_wifi.h>
+#include <esp_err.h>
+#include <esp_log.h>
+#include <nvs_flash.h>
 #include "bme680.h"
 #include "moisture_sensor.h"
 #include "tsl2561.h"
+#include "wifi_config.h"
 
 #define GREETING "\
 \n\n Welcome to\n \
@@ -70,9 +74,6 @@ by Leya Wehner and Julian Frank\n"
 #define I2C_FREQ      I2C_FREQ_100K
 
 #define MOISTURE_SENSOR_CHANNEL ADC1_CHANNEL_0
-
-#define ESP_WIFI_SSID "Obi LAN Kenobi"
-#define ESP_WIFI_PASS "7woi-va8z-l7ey"
 
 static const char *JSON_SENSOR_DATA = "{ \n"
                                       "\t\"temperature\": %d,\n"
@@ -180,8 +181,8 @@ void wifi_init_sta() {
 //  ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_LOST_IP, &wifi_event_handler, NULL));
     wifi_config_t wifi_config = {
             .sta = {
-                    .ssid = ESP_WIFI_SSID,
-                    .password = ESP_WIFI_PASS,
+                    .ssid = WIFI_SSID,
+                    .password = WIFI_PASS,
             },
     };
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
@@ -213,7 +214,8 @@ esp_err_t get_sensor_readout_handler(httpd_req_t *req) {
 
     char buff[strlen(JSON_SENSOR_DATA) + 512];
 
-    sprintf(buff, JSON_SENSOR_DATA, sensor_data.temperature, sensor_data.light_level, sensor_data.humidity, sensor_data.moisture);
+    sprintf(buff, JSON_SENSOR_DATA, sensor_data.temperature, sensor_data.light_level, sensor_data.humidity,
+            sensor_data.moisture);
 
     httpd_resp_send(req, buff, HTTPD_RESP_USE_STRLEN);
     return ESP_OK;
@@ -235,7 +237,7 @@ esp_err_t get_range_data_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
-esp_err_t post_config_temperature_handler(httpd_req_t * req) {
+esp_err_t post_config_temperature_handler(httpd_req_t *req) {
     ESP_LOGI(WEBSERVER_TAG, "Handling post config temperature request");
     /* Read the content length of the request */
     size_t content_length = req->content_len;
@@ -260,8 +262,8 @@ esp_err_t post_config_temperature_handler(httpd_req_t * req) {
 
         /* Print the received data to the console */
         ESP_LOGI(WEBSERVER_TAG, "Received data: %s", buffer);
-        char* temp_min_str = strtok(buffer, ":");
-        char* temp_max_str = strtok(NULL, ":");
+        char *temp_min_str = strtok(buffer, ":");
+        char *temp_max_str = strtok(NULL, ":");
 
         range_config.temperature_min = strtol(temp_min_str, NULL, 10);
         range_config.temperature_max = strtol(temp_max_str, NULL, 10);
@@ -272,7 +274,7 @@ esp_err_t post_config_temperature_handler(httpd_req_t * req) {
     return ESP_OK;
 }
 
-esp_err_t post_config_light_level_handler(httpd_req_t * req) {
+esp_err_t post_config_light_level_handler(httpd_req_t *req) {
     ESP_LOGI(WEBSERVER_TAG, "Handling post config light_level request");
     /* Read the content length of the request */
     size_t content_length = req->content_len;
@@ -297,19 +299,19 @@ esp_err_t post_config_light_level_handler(httpd_req_t * req) {
 
         /* Print the received data to the console */
         ESP_LOGI(WEBSERVER_TAG, "Received data: %s", buffer);
-        char* lght_min_str = strtok(buffer, ":");
-        char* lght_max_str = strtok(NULL, ":");
+        char *lght_min_str = strtok(buffer, ":");
+        char *lght_max_str = strtok(NULL, ":");
 
         range_config.light_level_min = strtol(lght_min_str, NULL, 10);
         range_config.light_level_max = strtol(lght_max_str, NULL, 10);
 
         /* Send a response back to the client */
         httpd_resp_send(req, "Data received successfully", HTTPD_RESP_USE_STRLEN);
-        }
+    }
     return ESP_OK;
 }
 
-esp_err_t post_config_humidity_handler(httpd_req_t * req) {
+esp_err_t post_config_humidity_handler(httpd_req_t *req) {
     ESP_LOGI(WEBSERVER_TAG, "Handling post config humidity request");
     /* Read the content length of the request */
     size_t content_length = req->content_len;
@@ -334,8 +336,8 @@ esp_err_t post_config_humidity_handler(httpd_req_t * req) {
 
         /* Print the received data to the console */
         ESP_LOGI(WEBSERVER_TAG, "Received data: %s", buffer);
-        char* humid_min_str = strtok(buffer, ":");
-        char* humid_max_str = strtok(NULL, ":");
+        char *humid_min_str = strtok(buffer, ":");
+        char *humid_max_str = strtok(NULL, ":");
 
         range_config.humidity_min = strtol(humid_min_str, NULL, 10);
         range_config.humidity_max = strtol(humid_max_str, NULL, 10);
@@ -346,7 +348,7 @@ esp_err_t post_config_humidity_handler(httpd_req_t * req) {
     return ESP_OK;
 }
 
-esp_err_t post_config_moisture_handler(httpd_req_t * req) {
+esp_err_t post_config_moisture_handler(httpd_req_t *req) {
     ESP_LOGI(WEBSERVER_TAG, "Handling post config moisture request");
     /* Read the content length of the request */
     size_t content_length = req->content_len;
@@ -371,8 +373,8 @@ esp_err_t post_config_moisture_handler(httpd_req_t * req) {
 
         /* Print the received data to the console */
         ESP_LOGI(WEBSERVER_TAG, "Received data: %s", buffer);
-        char* moist_min_str = strtok(buffer, ":");
-        char* moist_max_str = strtok(NULL, ":");
+        char *moist_min_str = strtok(buffer, ":");
+        char *moist_max_str = strtok(NULL, ":");
 
         range_config.moisture_min = strtol(moist_min_str, NULL, 10);
         range_config.moisture_max = strtol(moist_max_str, NULL, 10);
@@ -512,7 +514,7 @@ _Noreturn void update_sensor_data(void *pvParameters) {
             }
         }
         // passive waiting until 60 seconds are over
-        xTaskDelayUntil(&last_wakeup, 1000 / portTICK_PERIOD_MS);
+        vTaskDelayUntil(&last_wakeup, 1000 / portTICK_PERIOD_MS);
     }
 }
 

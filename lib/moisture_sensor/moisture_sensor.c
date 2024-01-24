@@ -14,10 +14,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include <stdio.h>
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "driver/adc.h"
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <driver/adc.h>
 #include "moisture_sensor.h"
 
 int map(int value, int from_low, int from_high, int to_low, int to_high) {

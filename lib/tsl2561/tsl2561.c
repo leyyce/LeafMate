@@ -42,13 +42,18 @@ float tsl2561_read_sensor_value(uint8_t bus) {
     float CH1;
     float div;
 
-    float lux = 0;
+    float lux;
 
     reg = prefix_register_address(0xC);
     i2c_slave_read(bus, 0x29, &reg, ch0, 2);
 
     reg = prefix_register_address(0xE);
     i2c_slave_read(bus, 0x29, &reg, ch1, 2);
+
+    // Prevent division by zero for the next step
+    if (((ch0[1] << 8) | ch0[0]) == 0) {
+        return 0;
+    }
 
     CH0 = (float) ((ch0[1] << 8) | ch0[0]);
     CH1 = (float) ((ch1[1] << 8) | ch1[0]);
@@ -67,7 +72,7 @@ float tsl2561_read_sensor_value(uint8_t bus) {
         lux = (float) (0.00146 * CH0 - 0.00112 * CH1);
     } else if (div > 1.3) {
         lux = 0;
-    }
+    } else lux = -1;
 
     return lux;
 }
