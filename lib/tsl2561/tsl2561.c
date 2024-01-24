@@ -15,6 +15,7 @@
  */
 
 #include <math.h>
+
 #include "esp8266_wrapper.h"
 #include "tsl2561.h"
 
