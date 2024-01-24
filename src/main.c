@@ -66,6 +66,9 @@
 Where Every Leaf Counts!\n\n \
 by Leya Wehner and Julian Frank\n"
 
+#define GPIO_ON 1
+#define GPIO_OFF 0
+
 #define TASK_STACK_DEPTH 2048
 
 #define I2C_BUS       0
@@ -74,6 +77,8 @@ by Leya Wehner and Julian Frank\n"
 #define I2C_FREQ      I2C_FREQ_100K
 
 #define MOISTURE_SENSOR_CHANNEL ADC1_CHANNEL_0
+
+#define PUMP_GPIO 26
 
 static const char *JSON_SENSOR_DATA = "{ \n"
                                       "\t\"temperature\": %d,\n"
@@ -99,7 +104,8 @@ extern const char config_html[] asm("_binary_config_html_start");
 static const char *MAIN_TAG = "Main";
 static const char *WIFI_TAG = "WiFi";
 static const char *WEBSERVER_TAG = "Server";
-static const char *SENSOR_READOUT_TAG = "Sensor readout";
+static const char *SENSOR_READOUT_TAG = "Sensor Readout";
+static const char *PUMP_TAG = "Pump Task";
 
 typedef struct {
     int temperature;
@@ -122,6 +128,11 @@ typedef struct {
     int moisture_max;
 } range_config_t;
 
+typedef struct {
+    int recheck_time; // in Minutes
+    int pump_time; // in Seconds
+} pump_config_t;
+
 sensor_data_t sensor_data = {
         .temperature = 0,
         .light_level = 0,
@@ -141,6 +152,11 @@ range_config_t range_config = {
 
         .moisture_min = 40,
         .moisture_max = 60,
+};
+
+pump_config_t pump_config = {
+        .recheck_time = 15,
+        .pump_time = 30,
 };
 
 bool wifi_established;
@@ -459,8 +475,27 @@ _Noreturn void update_sensor_data(void *pvParameters) {
                 // bme680_set_ambient_temperature(sensor, (int16_t) values.temperature);
             }
         }
-        // passive waiting until 60 seconds are over
+        // passive waiting until 1 second is over
         vTaskDelayUntil(&last_wakeup, 1000 / portTICK_PERIOD_MS)
+    }
+}
+
+void water_plant(void *pvParameters) {
+    (void) pvParameters;
+
+    while (1) {
+        ESP_LOGI(PUMP_TAG, "Checking if plant needs watering...");
+        ESP_LOGI(PUMP_TAG, "Measured soil moisture: %d ; Ideal soil moisture min: %d", sensor_data.moisture, range_config.moisture_min);
+        if (sensor_data.moisture < range_config.moisture_min) {
+            ESP_LOGI(PUMP_TAG, "Plant needs watering! Starting pump for %d seconds...", pump_config.pump_time);
+            gpio_set_level(PUMP_GPIO, GPIO_ON);
+            vTaskDelay(pdMS_TO_TICKS(pump_config.pump_time * 1000));
+            ESP_LOGI(PUMP_TAG, "Turning pump off and giving the water some time to settle.");
+            gpio_set_level(PUMP_GPIO, GPIO_OFF);
+        } else ESP_LOGI(PUMP_TAG, "Plant doesn't need to watered right now.");
+
+        ESP_LOGI(PUMP_TAG, "Rechecking soil moisture in %d minutes", pump_config.recheck_time);
+        vTaskDelay(pdMS_TO_TICKS(pump_config.recheck_time * 60000));
     }
 }
 
@@ -482,6 +517,11 @@ void bme680_init() {
         // bme680_set_heater_profile(sensor, 0, 200, 100);
         bme680_use_heater_profile(sensor, BME680_HEATER_NOT_USED);
     }
+}
+
+void pump_init() {
+    gpio_set_direction(PUMP_GPIO, GPIO_MODE_OUTPUT);
+    gpio_set_level(PUMP_GPIO, GPIO_OFF);
 }
 
 
@@ -518,14 +558,22 @@ void app_main() {
     // Init moisture sensor
     moisture_sensor_init(MOISTURE_SENSOR_CHANNEL);
 
+    // Init pump
+    pump_init();
 
     /** -- TASK CREATION --- */
 
     // must be done last to avoid concurrency situations with the sensor configuration
 
     // Create a task that uses the sensor
-    if (sensor)
+    if (sensor) {
         xTaskCreate(update_sensor_data, "update_sensor_data", TASK_STACK_DEPTH, NULL, 2, NULL);
+
+        // Give the sensors some time for accurate readings before starting the water_plant task
+        vTaskDelay(pdMS_TO_TICKS(30 * 1000));
+
+        xTaskCreate(water_plant, "water_plant", TASK_STACK_DEPTH, NULL, 2, NULL);
+    }
     else
         ESP_LOGE(MAIN_TAG, "Could not initialize BME680 sensor");
 }
