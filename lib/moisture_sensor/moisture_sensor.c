@@ -25,7 +25,7 @@ int map(int value, int from_low, int from_high, int to_low, int to_high) {
     result += to_low;
 
     if (result < to_low) result = to_low;
-    if (result > to_high) result = to_high;
+    else if (result > to_high) result = to_high;
 
     return result;
 }

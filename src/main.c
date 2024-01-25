@@ -66,8 +66,8 @@
 Where Every Leaf Counts!\n\n \
 by Leya Wehner and Julian Frank\n"
 
-#define GPIO_ON 1
 #define GPIO_OFF 0
+#define GPIO_ON 1
 
 #define TASK_STACK_DEPTH 2048
 
@@ -483,6 +483,9 @@ _Noreturn void update_sensor_data(void *pvParameters) {
 void water_plant(void *pvParameters) {
     (void) pvParameters;
 
+    // Give the sensors some time for accurate readings before entering the loop
+    vTaskDelay(pdMS_TO_TICKS(30 * 1000));
+
     while (1) {
         ESP_LOGI(PUMP_TAG, "Checking if plant needs watering...");
         ESP_LOGI(PUMP_TAG, "Measured soil moisture: %d ; Ideal soil moisture min: %d", sensor_data.moisture, range_config.moisture_min);
@@ -562,16 +565,8 @@ void app_main() {
     pump_init();
 
     /** -- TASK CREATION --- */
-
-    // must be done last to avoid concurrency situations with the sensor configuration
-
-    // Create a task that uses the sensor
     if (sensor) {
         xTaskCreate(update_sensor_data, "update_sensor_data", TASK_STACK_DEPTH, NULL, 2, NULL);
-
-        // Give the sensors some time for accurate readings before starting the water_plant task
-        vTaskDelay(pdMS_TO_TICKS(30 * 1000));
-
         xTaskCreate(water_plant, "water_plant", TASK_STACK_DEPTH, NULL, 2, NULL);
     }
     else
