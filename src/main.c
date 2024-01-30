@@ -150,7 +150,7 @@ range_config_t range_config = {
         .humidity_min = 40,
         .humidity_max = 60,
 
-        .moisture_min = 40,
+        .moisture_min = 20,
         .moisture_max = 60,
 };
 
@@ -265,7 +265,7 @@ esp_err_t get_config_handler(httpd_req_t *req) {
 
 esp_err_t get_sensor_readout_handler(httpd_req_t *req) {
     ESP_LOGI(WEBSERVER_TAG, "Handling sensor readout request");
-    httpd_resp_set_hdr(req, "Content-Type", "application/json");
+    httpd_resp_set_type(req, "application/json");
 
     char buff[strlen(JSON_SENSOR_DATA) + 512];
 
@@ -278,7 +278,7 @@ esp_err_t get_sensor_readout_handler(httpd_req_t *req) {
 
 esp_err_t get_range_data_handler(httpd_req_t *req) {
     ESP_LOGI(WEBSERVER_TAG, "Handling range data request");
-    httpd_resp_set_hdr(req, "Content-Type", "application/json");
+    httpd_resp_set_type(req, "application/json");
 
     char buff[strlen(JSON_RANGE_DATA) + 512];
 
@@ -493,7 +493,7 @@ void water_plant(void *pvParameters) {
             ESP_LOGI(PUMP_TAG, "Plant needs watering! Starting pump for %d seconds...", pump_config.pump_time);
             gpio_set_level(PUMP_GPIO, GPIO_ON);
             vTaskDelay(pdMS_TO_TICKS(pump_config.pump_time * 1000));
-            ESP_LOGI(PUMP_TAG, "Turning pump off and giving the water some time to settle.");
+            ESP_LOGI(PUMP_TAG, "Turning pump off and giving the water some time to settle...");
             gpio_set_level(PUMP_GPIO, GPIO_OFF);
         } else ESP_LOGI(PUMP_TAG, "Plant doesn't need to watered right now.");
 
