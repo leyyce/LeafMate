@@ -14,6 +14,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include <math.h>
 #include <stdio.h>
 #include <stdbool.h>
 
@@ -466,9 +467,9 @@ _Noreturn void update_sensor_data(void *pvParameters) {
                 ESP_LOGI(SENSOR_READOUT_TAG, "Temp: %.2f °C, Light: %.2f lux, Hum: %.2f %%, Moist: %d %%",
                        values.temperature, lux, values.humidity, moisture);
 
-                sensor_data.temperature = (int) values.temperature;
-                sensor_data.light_level = (int) lux;
-                sensor_data.humidity = (int) values.humidity;
+                sensor_data.temperature = (int) roundf(values.temperature);
+                sensor_data.light_level = (int) roundf(lux);
+                sensor_data.humidity = (int) roundf(values.humidity);
                 sensor_data.moisture = moisture;
 
                 // values.pressure, values.gas_resistance);
@@ -487,9 +488,10 @@ void water_plant(void *pvParameters) {
     vTaskDelay(pdMS_TO_TICKS(30 * 1000));
 
     while (1) {
+        int ideal = (int) roundf(range_config.moisture_min + (( (float) (range_config.moisture_max - range_config.moisture_min) ) / 2));
         ESP_LOGI(PUMP_TAG, "Checking if plant needs watering...");
-        ESP_LOGI(PUMP_TAG, "Measured soil moisture: %d ; Ideal soil moisture min: %d", sensor_data.moisture, range_config.moisture_min);
-        if (sensor_data.moisture < range_config.moisture_min) {
+        ESP_LOGI(PUMP_TAG, "Measured soil moisture: %d %%; Ideal soil moisture: %d %%", sensor_data.moisture, ideal);
+        if (sensor_data.moisture < ideal) {
             ESP_LOGI(PUMP_TAG, "Plant needs watering! Starting pump for %d seconds...", pump_config.pump_time);
             gpio_set_level(PUMP_GPIO, GPIO_ON);
             vTaskDelay(pdMS_TO_TICKS(pump_config.pump_time * 1000));
