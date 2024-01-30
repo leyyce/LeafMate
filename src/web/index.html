@@ -211,20 +211,37 @@
             background-color: #262A2B;
             color: #fff;
             text-align: center;
-            padding-top: 1em;
-            padding-bottom: 1em;
+            padding-top: .75em;
+            padding-bottom: .25em;
             width: 100%;
         }
 
         footer p {
-            margin: 0;
+            margin: 0 0 10px;
             font-size: 14px;
         }
 
-        footer i {
+        footer i.icon-heart {
             color: red;
-            margin-left: 5px;
-            margin-right: 5px;
+            margin-left: 2px;
+            margin-right: 2px;
+        }
+
+        #links {
+            font-size: 22px;
+        }
+
+        #links a {
+            text-decoration: none;
+        }
+
+        #links i.icon-github {
+            color: white;
+            margin-left: 4px;
+        }
+
+        #links i.icon-codeberg-logo_icon_blue {
+            margin-right: 4px;
         }
     </style>
 </head>
@@ -253,6 +270,10 @@
     </main>
     <footer>
         <p>Made with <i class="icon-heart"></i> by Leya Wehner & Julian Frank</p>
+        <span id="links">
+            <a href="https://codeberg.org/leya/LeafMate" target="_blank"><i class="icon-codeberg-logo_icon_blue"><span class="path1"></span><span class="path2"></span></i></a>
+            <a href="https://github.com/leyyce/LeafMate" target="_blank"><i class="icon-github"></i></a>
+        </span>
     </footer>
 </body>
 </html>
