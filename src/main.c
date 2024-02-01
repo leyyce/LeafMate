@@ -99,8 +99,10 @@ static const char *JSON_RANGE_DATA = "{ \n"
                                      "\t\"moisture_max\": %d\n"
                                      "}\n";
 
-extern const char index_html[] asm("_binary_index_html_start");
-extern const char config_html[] asm("_binary_config_html_start");
+extern const unsigned char index_html_gz_start[] asm("_binary_index_html_gz_start");
+extern const unsigned char index_html_gz_end[] asm("_binary_index_html_gz_end");
+extern const unsigned char config_html_gz_start[] asm("_binary_config_html_gz_start");
+extern const unsigned char config_html_gz_end[] asm("_binary_config_html_gz_end");
 
 static const char *MAIN_TAG = "Main";
 static const char *WIFI_TAG = "WiFi";
@@ -213,7 +215,7 @@ void wifi_init_sta() {
 // --------------------------------------------------------------------------------------------------------------------
 // Webserver stuff
 
-esp_err_t receive_and_parse_data(httpd_req_t *req, long *min_val, long *max_val, char *kind) {
+esp_err_t receive_and_parse_data(httpd_req_t *req, int *min_val, int *max_val, char *kind) {
     ESP_LOGI(WEBSERVER_TAG, "Handling post config %s request", kind);
     /* Read the content length of the request */
     size_t content_length = req->content_len;
@@ -254,13 +256,21 @@ esp_err_t receive_and_parse_data(httpd_req_t *req, long *min_val, long *max_val,
 
 esp_err_t get_root_handler(httpd_req_t *req) {
     ESP_LOGI(WEBSERVER_TAG, "Handling root request");
-    httpd_resp_send(req, index_html, HTTPD_RESP_USE_STRLEN);
+    httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
+
+    const ssize_t index_html_gz_size = (index_html_gz_end - index_html_gz_start);
+    httpd_resp_send(req, (const char *) index_html_gz_start, index_html_gz_size);
+
     return ESP_OK;
 }
 
 esp_err_t get_config_handler(httpd_req_t *req) {
     ESP_LOGI(WEBSERVER_TAG, "Handling config request");
-    httpd_resp_send(req, config_html, HTTPD_RESP_USE_STRLEN);
+    httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
+
+    const ssize_t config_html_gz_size = (config_html_gz_end - config_html_gz_start);
+    httpd_resp_send(req, (const char *) config_html_gz_start, config_html_gz_size);
+
     return ESP_OK;
 }
 
@@ -294,57 +304,45 @@ esp_err_t get_range_data_handler(httpd_req_t *req) {
 }
 
 esp_err_t post_config_temperature_handler(httpd_req_t *req) {
-    long min, max;
     esp_err_t ret;
 
-    if ((ret = receive_and_parse_data(req, &min, &max, "temperature")) != ESP_OK) {
+    if ((ret = receive_and_parse_data(req, &range_config.temperature_min, &range_config.temperature_max,
+                                      "temperature")) != ESP_OK) {
         return ret;
     }
-
-    range_config.temperature_min = min;
-    range_config.temperature_max = max;
 
     return ret;
 }
 
 esp_err_t post_config_light_level_handler(httpd_req_t *req) {
-    long min, max;
     esp_err_t ret;
 
-    if ((ret = receive_and_parse_data(req, &min, &max, "light_level")) != ESP_OK) {
+    if ((ret = receive_and_parse_data(req, &range_config.light_level_min, &range_config.light_level_max,
+                                      "light_level")) != ESP_OK) {
         return ret;
     }
-
-    range_config.light_level_min = min;
-    range_config.light_level_max = max;
 
     return ret;
 }
 
 esp_err_t post_config_humidity_handler(httpd_req_t *req) {
-    long min, max;
     esp_err_t ret;
 
-    if ((ret = receive_and_parse_data(req, &min, &max, "humidity")) != ESP_OK) {
+    if ((ret = receive_and_parse_data(req, &range_config.humidity_min, &range_config.humidity_max, "humidity")) !=
+        ESP_OK) {
         return ret;
     }
-
-    range_config.humidity_min = min;
-    range_config.humidity_max = max;
 
     return ret;
 }
 
 esp_err_t post_config_moisture_handler(httpd_req_t *req) {
-    long min, max;
     esp_err_t ret;
 
-    if ((ret = receive_and_parse_data(req, &min, &max, "moisture")) != ESP_OK) {
+    if ((ret = receive_and_parse_data(req, &range_config.moisture_min, &range_config.moisture_max, "moisture")) !=
+        ESP_OK) {
         return ret;
     }
-
-    range_config.moisture_min = min;
-    range_config.moisture_max = max;
 
     return ret;
 }
@@ -465,7 +463,7 @@ _Noreturn void update_sensor_data(void *pvParameters) {
                 int moisture = moisture_sensor_read(MOISTURE_SENSOR_CHANNEL);
 
                 ESP_LOGI(SENSOR_READOUT_TAG, "Temp: %.2f °C, Light: %.2f lux, Hum: %.2f %%, Moist: %d %%",
-                       values.temperature, lux, values.humidity, moisture);
+                         values.temperature, lux, values.humidity, moisture);
 
                 sensor_data.temperature = (int) roundf(values.temperature);
                 sensor_data.light_level = (int) roundf(lux);
@@ -488,7 +486,8 @@ void water_plant(void *pvParameters) {
     vTaskDelay(pdMS_TO_TICKS(30 * 1000));
 
     while (1) {
-        int ideal = (int) roundf(range_config.moisture_min + (( (float) (range_config.moisture_max - range_config.moisture_min) ) / 2));
+        int ideal = (int) roundf(
+                range_config.moisture_min + (((float) (range_config.moisture_max - range_config.moisture_min)) / 2));
         ESP_LOGI(PUMP_TAG, "Checking if plant needs watering...");
         ESP_LOGI(PUMP_TAG, "Measured soil moisture: %d %%; Ideal soil moisture: %d %%", sensor_data.moisture, ideal);
         if (sensor_data.moisture < ideal) {
@@ -497,7 +496,8 @@ void water_plant(void *pvParameters) {
             vTaskDelay(pdMS_TO_TICKS(pump_config.pump_time * 1000));
             ESP_LOGI(PUMP_TAG, "Turning pump off and giving the water some time to settle...");
             gpio_set_level(PUMP_GPIO, GPIO_OFF);
-        } else ESP_LOGI(PUMP_TAG, "Plant doesn't need to watered right now.");
+        } else
+            ESP_LOGI(PUMP_TAG, "Plant doesn't need to watered right now.");
 
         ESP_LOGI(PUMP_TAG, "Rechecking soil moisture in %d minutes", pump_config.recheck_time);
         vTaskDelay(pdMS_TO_TICKS(pump_config.recheck_time * 60000));
@@ -570,7 +570,6 @@ void app_main() {
     if (sensor) {
         xTaskCreate(update_sensor_data, "update_sensor_data", TASK_STACK_DEPTH, NULL, 2, NULL);
         xTaskCreate(water_plant, "water_plant", TASK_STACK_DEPTH, NULL, 2, NULL);
-    }
-    else
+    } else
         ESP_LOGE(MAIN_TAG, "Could not initialize BME680 sensor");
 }
