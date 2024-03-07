@@ -1,3 +1,4 @@
+#include <sys/cdefs.h>
 /*
  * LeafMate - Plant monitoring for the ESP32
  * Copyright (C) 2024  Leya Wehner
@@ -168,6 +169,8 @@ bool wifi_established;
 
 static bme680_sensor_t *sensor = 0;
 
+void update_sensor_data();
+
 // WiFi stuff
 
 static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data) {
@@ -282,6 +285,7 @@ esp_err_t get_sensor_readout_handler(httpd_req_t *req) {
 
     char buff[strlen(JSON_SENSOR_DATA) + 512];
 
+    update_sensor_data();
     sprintf(buff, JSON_SENSOR_DATA, sensor_data.temperature, sensor_data.light_level, sensor_data.humidity,
             sensor_data.moisture);
 
@@ -440,57 +444,50 @@ httpd_handle_t start_webserver(void) {
  * function *vTaskDelay* to wait for measurement results. Busy wating
  * alternative is shown in comments
  */
-_Noreturn void update_sensor_data(void *pvParameters) {
-    (void) pvParameters;
-
+void update_sensor_data() {
     bme680_values_float_t values;
-
-    TickType_t last_wakeup = xTaskGetTickCount();
 
     // as long as sensor configuration isn't changed, duration is constant
     uint32_t duration = bme680_get_measurement_duration(sensor);
 
-    while (1) {
-        // trigger the sensor to start one TPHG measurement cycle
-        if (bme680_force_measurement(sensor)) {
-            // passive waiting until measurement results are available
-            vTaskDelay(duration);
+    // trigger the sensor to start one TPHG measurement cycle
+    if (bme680_force_measurement(sensor)) {
+        // passive waiting until measurement results are available
+        vTaskDelay(duration);
 
-            // alternatively: busy waiting until measurement results are available
-            // while (bme680_is_measuring (sensor)) ;
+        // alternatively: busy waiting until measurement results are available
+        // while (bme680_is_measuring (sensor)) ;
 
-            // get the results and do something with them
-            if (bme680_get_results_float(sensor, &values)) {
-                float lux = tsl2561_read_sensor_value(I2C_BUS);
-                int moisture = moisture_sensor_read();
+        // get the results and do something with them
+        if (bme680_get_results_float(sensor, &values)) {
+            float lux = tsl2561_read_sensor_value(I2C_BUS);
+            int moisture = moisture_sensor_read();
 
-                ESP_LOGI(SENSOR_READOUT_TAG, "Temp: %.2f °C, Light: %.2f lux, Hum: %.2f %%, Moist: %d %%",
-                         values.temperature, lux, values.humidity, moisture);
+            ESP_LOGI(SENSOR_READOUT_TAG, "Temp: %.2f °C, Light: %.2f lux, Hum: %.2f %%, Moist: %d %%",
+                     values.temperature, lux, values.humidity, moisture);
 
-                sensor_data.temperature = (int) roundf(values.temperature);
-                sensor_data.light_level = (int) roundf(lux);
-                sensor_data.humidity = (int) roundf(values.humidity);
-                sensor_data.moisture = moisture;
+            sensor_data.temperature = (int) roundf(values.temperature);
+            sensor_data.light_level = (int) roundf(lux);
+            sensor_data.humidity = (int) roundf(values.humidity);
+            sensor_data.moisture = moisture;
 
-                // values.pressure, values.gas_resistance);
-                // bme680_set_ambient_temperature(sensor, (int16_t) values.temperature);
-            }
+            // values.pressure, values.gas_resistance);
+            // bme680_set_ambient_temperature(sensor, (int16_t) values.temperature);
         }
-        // passive waiting until 1 second is over
-        vTaskDelayUntil(&last_wakeup, 1000 / portTICK_PERIOD_MS)
     }
 }
 
-void water_plant(void *pvParameters) {
+_Noreturn void water_plant(void *pvParameters) {
     (void) pvParameters;
 
-    // Give the sensors some time for accurate readings before entering the loop
-    vTaskDelay(pdMS_TO_TICKS(30 * 1000));
+    // Wait 5 minutes before checking the pump for the first time to make sure the hardware is set up correctly.
+    vTaskDelay(pdMS_TO_TICKS(5 * 60000));
 
     while (1) {
         int ideal = (int) roundf(
                 range_config.moisture_min + (((float) (range_config.moisture_max - range_config.moisture_min)) / 2));
         ESP_LOGI(PUMP_TAG, "Checking if plant needs watering...");
+        update_sensor_data();
         ESP_LOGI(PUMP_TAG, "Measured soil moisture: %d %%; Ideal soil moisture: %d %%", sensor_data.moisture, ideal);
         if (sensor_data.moisture < ideal) {
             ESP_LOGI(PUMP_TAG, "Plant needs watering! Starting pump for %d seconds...", pump_config.pump_time);
@@ -579,7 +576,7 @@ void app_main() {
 
     /** -- TASK CREATION --- */
     if (sensor) {
-        xTaskCreate(update_sensor_data, "update_sensor_data", TASK_STACK_DEPTH, NULL, 2, NULL);
+        // xTaskCreate(update_sensor_data, "update_sensor_data", TASK_STACK_DEPTH, NULL, 2, NULL);
         xTaskCreate(water_plant, "water_plant", TASK_STACK_DEPTH, NULL, 2, NULL);
     } else
         ESP_LOGE(MAIN_TAG, "Could not initialize BME680 sensor");
