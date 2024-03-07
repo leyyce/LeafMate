@@ -496,7 +496,7 @@ _Noreturn void water_plant(void *pvParameters) {
             ESP_LOGI(PUMP_TAG, "Turning pump off and giving the water some time to settle...");
             gpio_set_level(PUMP_GPIO, GPIO_OFF);
         } else
-            ESP_LOGI(PUMP_TAG, "Plant doesn't need to watered right now.");
+            ESP_LOGI(PUMP_TAG, "Plant doesn't need to be watered right now.");
 
         ESP_LOGI(PUMP_TAG, "Rechecking soil moisture in %d minutes", pump_config.recheck_time);
         vTaskDelay(pdMS_TO_TICKS(pump_config.recheck_time * 60000));
