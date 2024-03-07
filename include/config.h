@@ -14,13 +14,14 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef LEAFMATE_MOISTURE_SENSOR_H
-#define LEAFMATE_MOISTURE_SENSOR_H
+#ifndef LEAFMATE_CONFIG_H
+#define LEAFMATE_CONFIG_H
 
-int moisture_sensor_read_raw();
+#define WIFI_SSID "Your WiFi SSID"
+#define WIFI_PASS "your-wifi-pass"
 
-int moisture_sensor_read();
+// #define CONFIG_MODE
+#define MOISTURE_SENSOR_DRY_VAL 2295
+#define MOISTURE_SENSOR_WET_VAL 1430
 
-void moisture_sensor_init(adc_unit_t adc_unit, adc_channel_t adc_channel);
-
-#endif //LEAFMATE_MOISTURE_SENSOR_H
+#endif //LEAFMATE_CONFIG_H

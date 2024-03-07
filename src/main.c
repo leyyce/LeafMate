@@ -18,17 +18,18 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-#include <driver/adc.h>
+#include <hal/adc_types.h>
 #include <esp_http_server.h>
 #include <esp_event.h>
 #include <esp_wifi.h>
 #include <esp_err.h>
 #include <esp_log.h>
 #include <nvs_flash.h>
+
 #include "bme680.h"
+#include "config.h"
 #include "moisture_sensor.h"
 #include "tsl2561.h"
-#include "wifi_config.h"
 
 #define GREETING "\
 \n\n Welcome to\n \
@@ -77,7 +78,8 @@ by Leya Wehner and Julian Frank\n"
 #define I2C_SCL_PIN   22
 #define I2C_FREQ      I2C_FREQ_100K
 
-#define MOISTURE_SENSOR_CHANNEL ADC1_CHANNEL_0
+#define MOISTURE_SENSOR_UNIT ADC_UNIT_1
+#define MOISTURE_SENSOR_CHANNEL ADC_CHANNEL_0
 
 #define PUMP_GPIO 26
 
@@ -460,7 +462,7 @@ _Noreturn void update_sensor_data(void *pvParameters) {
             // get the results and do something with them
             if (bme680_get_results_float(sensor, &values)) {
                 float lux = tsl2561_read_sensor_value(I2C_BUS);
-                int moisture = moisture_sensor_read(MOISTURE_SENSOR_CHANNEL);
+                int moisture = moisture_sensor_read();
 
                 ESP_LOGI(SENSOR_READOUT_TAG, "Temp: %.2f °C, Light: %.2f lux, Hum: %.2f %%, Moist: %d %%",
                          values.temperature, lux, values.humidity, moisture);
@@ -533,6 +535,18 @@ void pump_init() {
 void app_main() {
     puts(GREETING);
 
+    // Init moisture sensor
+    moisture_sensor_init(MOISTURE_SENSOR_UNIT, MOISTURE_SENSOR_CHANNEL);
+
+#ifdef CONFIG_MODE
+    puts("LEAFMATE IS RUNNING IN CONFIG MODE!");
+    puts("After you're finished setting up the moisture sensor comment out the\n\n#define CONFIG_MODE\n\n"
+         "line in include/config.h and recompile LeafMate.\n\n");
+    while (1) {
+        printf("Raw ADC Reading: %d\n", moisture_sensor_read_raw());
+        vTaskDelay(pdMS_TO_TICKS(5000));
+    }
+#else
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         ESP_ERROR_CHECK(nvs_flash_erase());
@@ -542,7 +556,7 @@ void app_main() {
 
     wifi_init_sta();
 
-    while (!wifi_established);
+    while (!wifi_established) { vTaskDelay(1); }
 
     start_webserver();
 
@@ -560,9 +574,6 @@ void app_main() {
     // TSL2561 init
     tsl2561_sensor_init(I2C_BUS);
 
-    // Init moisture sensor
-    moisture_sensor_init(MOISTURE_SENSOR_CHANNEL);
-
     // Init pump
     pump_init();
 
@@ -572,4 +583,5 @@ void app_main() {
         xTaskCreate(water_plant, "water_plant", TASK_STACK_DEPTH, NULL, 2, NULL);
     } else
         ESP_LOGE(MAIN_TAG, "Could not initialize BME680 sensor");
+#endif //CONFIG_MODE
 }
