@@ -17,7 +17,7 @@
 #ifndef LEAFMATE_MOISTURE_SENSOR_H
 #define LEAFMATE_MOISTURE_SENSOR_H
 
-int moisture_sensor_read_raw();
+int moisture_sensor_read_raw(int num_of_reads);
 
 int moisture_sensor_read();
 

@@ -35,24 +35,22 @@ int map(int value, int from_low, int from_high, int to_low, int to_high) {
     return result;
 }
 
-int moisture_sensor_read_raw() {
-    int reads = 10;
-
+int moisture_sensor_read_raw(int num_of_reads) {
     int avg = 0;
     int raw;
 
     // Perform multiple ADC readings for better accuracy
-    for (int i = 0; i < reads; i++) {
+    for (int i = 0; i < num_of_reads; i++) {
         ESP_ERROR_CHECK(adc_oneshot_read(handle, channel, &raw));
         avg += raw;
         vTaskDelay(pdMS_TO_TICKS(10));  // Short delay between readings
     }
 
-    return avg / reads;  // Calculate average reading
+    return avg / num_of_reads;  // Calculate average reading
 }
 
 int moisture_sensor_read() {
-    int raw = moisture_sensor_read_raw();
+    int raw = moisture_sensor_read_raw(10);
 
     // int voltage = adc_reading * 2450 / 4095;
     // Convert ADC reading to moisture level based on sensor characteristics
