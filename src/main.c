@@ -643,7 +643,7 @@ static _Noreturn void water_plant() {
 
         ESP_LOGI(PUMP_TAG, "Measured soil moisture: %d %%; Ideal soil moisture: %d %%", sensor_data.moisture, ideal);
         if (sensor_data.moisture < ideal) {
-            ESP_LOGI(PUMP_TAG, "Plant needs watering! Starting pump for %d seconds...", pump_config.pump_watering_time_ms);
+            ESP_LOGI(PUMP_TAG, "Plant needs watering! Starting pump for %d seconds...", pump_config.pump_watering_time_ms / 1000);
             /* activate the water pump by setting the GPIO-level to ON for the specified pump time then turn OFF again*/
             gpio_set_level(PUMP_GPIO, GPIO_ON);
             vTaskDelay(pdMS_TO_TICKS(pump_config.pump_watering_time_ms));
@@ -652,7 +652,7 @@ static _Noreturn void water_plant() {
         } else
             ESP_LOGI(PUMP_TAG, "Plant doesn't need to be watered right now.");
 
-        ESP_LOGI(PUMP_TAG, "Rechecking soil moisture in %d minutes", pump_config.recheck_time_ms);
+        ESP_LOGI(PUMP_TAG, "Rechecking soil moisture in %d minutes", pump_config.recheck_time_ms / 60000);
         /* Check */
         vTaskDelay(pdMS_TO_TICKS(pump_config.recheck_time_ms));
     }
