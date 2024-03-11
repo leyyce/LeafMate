@@ -195,10 +195,10 @@ static void update_sensor_data();
 
 
 /* ------------------------------------------------------------------------------------------------------------------ */
-/* Start of WiFi initialization and event handling */
+/* Start of Wi-Fi initialization and event handling */
 
 /*
- * Handles the connection to WiFi
+ * Handles the connection to Wi-Fi
  * Sets the value of the wifi_established boolean
  * also logs esp WiFi-events
 */
@@ -224,7 +224,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
 
 /*
  * Initiates the network-interface of the esp
- * Utilizes the default, provided WiFi initialization config
+ * Utilizes the default, provided Wi-Fi initialization config
  * Uses the values defined inside of config.h for the SSID and password of the network
  * Uses ESP_ERROR_CHECK to provide error-handling
 */
@@ -252,7 +252,7 @@ static void wifi_init_sta() {
     ESP_ERROR_CHECK(esp_wifi_start());
 }
 
-/* End of WiFi initialization and event handling */
+/* End of Wi-Fi initialization and event handling */
 /* ------------------------------------------------------------------------------------------------------------------ */
 
 /* ------------------------------------------------------------------------------------------------------------------ */
@@ -559,7 +559,7 @@ static void update_sensor_data() {
 
     /* Start a measurement of humidity and temperature via the bme680 sensor */
     if (bme680_force_measurement(sensor)) {
-        /* Passive wating for the duration of the measurement
+        /* Passive waiting for the duration of the measurement
          * Utilization of active waiting via a while-loop and the bme680_is_measuring function possible too */
         vTaskDelay(duration);
         if (bme680_get_results_float(sensor, &values)) {
