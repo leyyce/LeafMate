@@ -309,7 +309,7 @@ static esp_err_t receive_and_parse_data(httpd_req_t *req, int *min_val, int *max
         *min_val = strtol(temp_min_str, NULL, 10);
         *max_val = strtol(temp_max_str, NULL, 10);
 
-        ESP_LOGI(WEBSERVER_TAG, "Config updated successfully => %s_min = %d and %s_max = %d.", kind, *min_val, kind,
+        ESP_LOGI(WEBSERVER_TAG, "Config updated successfully => %s_min=%d ; %s_max=%d", kind, *min_val, kind,
                  *max_val);
     }
 
@@ -522,7 +522,6 @@ static httpd_uri_t uri_post_config_moisture_level = {
 
 /* Starts the webserver and registers handlers */
 static httpd_handle_t start_webserver() {
-    ESP_LOGI(WEBSERVER_TAG, "Starting server");
     /* Generate default configuration */
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     /* Empty handle to esp_http_server */
@@ -539,6 +538,11 @@ static httpd_handle_t start_webserver() {
         httpd_register_uri_handler(server, &uri_post_config_light_level);
         httpd_register_uri_handler(server, &uri_post_config_humidity_level);
         httpd_register_uri_handler(server, &uri_post_config_moisture_level);
+
+        ESP_LOGI(WEBSERVER_TAG, "Server started successfully!");
+    } else {
+        ESP_LOGE(WEBSERVER_TAG, "Failed to start webserver. Resetting device...");
+        esp_restart();
     }
     return server;
 }
@@ -586,7 +590,7 @@ static void update_sensor_data() {
  * notes:               _Noreturn tells the compiler that the function should never return and makes it act accordingly
  */
 static _Noreturn void water_plant() {
-    ESP_LOGI(PUMP_TAG, "Pump task started!");
+    ESP_LOGI(PUMP_TAG, "Pump task started successfully!");
     ESP_LOGI(PUMP_TAG, "Waiting for 5 minutes before checking soil moisture levels "
                        "to give you enough time to set the hardware up correctly.");
 
@@ -666,6 +670,7 @@ void app_main() {
     while (!wifi_established) { vTaskDelay(1); }
 
     /* Start the ESP-Webserver */
+    ESP_LOGI(MAIN_TAG, "Starting server...");
     start_webserver();
 
     /* Initializing the I2C-BUS-Interfaces*/
@@ -683,6 +688,7 @@ void app_main() {
     /*  TASK CREATION  */
     if (sensor) {
         /* creates a Task that periodically checks if the plant needs watering */
+        ESP_LOGI(MAIN_TAG, "Starting pump task...");
         xTaskCreate(water_plant, "water_plant", TASK_STACK_DEPTH, NULL, 2, NULL);
     } else
         ESP_LOGE(MAIN_TAG, "Could not initialize BME680 sensor");
