@@ -155,7 +155,7 @@ typedef struct {
     int pump_watering_time_ms;
 } pump_config_t;
 
-/* Initialising a sensor data object with values of 0 */
+/* Initialising a sensor data object with all values set to 0 */
 static sensor_data_t sensor_data = {
         .temperature = 0,
         .light_level = 0,
@@ -187,7 +187,7 @@ static pump_config_t pump_config = {
 /* Has a Wifi-Connection been established? */
 static bool wifi_established;
 
-/* pointer for our bme680_sensor_t object to be used later when the sensor gets initialized! */
+/* Pointer to bme680 sensor struct */
 static bme680_sensor_t *sensor = 0;
 
 /* Declaring functions so that they can be used before they are implemented */
@@ -255,10 +255,8 @@ static void wifi_init_sta() {
 /* End of WiFi initialization and event handling */
 /* ------------------------------------------------------------------------------------------------------------------ */
 
-
 /* ------------------------------------------------------------------------------------------------------------------ */
 /* Start of webserver section */
-
 
 /*
  * The receive_and_parse_data function handles POST requests to the webserver
@@ -293,6 +291,7 @@ static esp_err_t receive_and_parse_data(httpd_req_t *req, int *min_val, int *max
         if (read_len <= 0) {
             /* Handle error */
             httpd_resp_send_500(req);
+            ESP_LOGE(WEBSERVER_TAG, "Failed to read from request body. %s min and max values not updated.", kind);
             return ESP_FAIL;
         }
 
@@ -334,7 +333,6 @@ static inline void send_html_response(httpd_req_t *req, const unsigned char *sta
 /* start of handler functions */
 
 /*
- *
  * The get_root_handler function handles GET requests to the webserver root
  * Replies with the gzip compressed index.html
  *
@@ -351,7 +349,6 @@ static esp_err_t get_root_handler(httpd_req_t *req) {
 }
 
 /*
- *
  * The get_config_handler function handles GET requests to the /config path
  * Replies with the gzip compressed config.html
  *
@@ -368,7 +365,6 @@ static esp_err_t get_config_handler(httpd_req_t *req) {
 }
 
 /*
- *
  * The get_sensor_readout_handler replies to the GET request with the JSON formatted sensor data
  *
  * httpd_req_t *req:    Pointer to the received HTTP request
@@ -390,7 +386,6 @@ static esp_err_t get_sensor_readout_handler(httpd_req_t *req) {
 }
 
 /*
- *
  * The post_config_temperature_handler replies to the GET request with the JSON formatted range data
  *
  * httpd_req_t *req:    Pointer to the received HTTP request
@@ -414,7 +409,6 @@ static esp_err_t get_range_data_handler(httpd_req_t *req) {
 }
 
 /*
- *
  * The post_config_temperature_handler function handles POST requests to update the ideal temperature range
  *
  * httpd_req_t *req:    Pointer to the received HTTP request
@@ -422,19 +416,10 @@ static esp_err_t get_range_data_handler(httpd_req_t *req) {
  * returns:             e.g. ESP_OK on success or ESP_FAIL on failed read from request body
  */
 static esp_err_t post_config_temperature_handler(httpd_req_t *req) {
-    esp_err_t ret;
-
-    /* Updates the range values for the temperature */
-    if ((ret = receive_and_parse_data(req, &range_config.temperature_min, &range_config.temperature_max,
-                                      "temperature")) != ESP_OK) {
-        return ret;
-    }
-
-    return ret;
+    return receive_and_parse_data(req, &range_config.temperature_min, &range_config.temperature_max, "temperature");
 }
 
 /*
- *
  * The post_config_light_level_handler function handles POST requests to update the ideal light level range
  *
  * httpd_req_t *req:    Pointer to the received HTTP request
@@ -442,18 +427,10 @@ static esp_err_t post_config_temperature_handler(httpd_req_t *req) {
  * returns:             e.g. ESP_OK on success or ESP_FAIL on failed read from request body
  */
 static esp_err_t post_config_light_level_handler(httpd_req_t *req) {
-    esp_err_t ret;
-
-    if ((ret = receive_and_parse_data(req, &range_config.light_level_min, &range_config.light_level_max,
-                                      "light_level")) != ESP_OK) {
-        return ret;
-    }
-
-    return ret;
+    return receive_and_parse_data(req, &range_config.light_level_min, &range_config.light_level_max, "light_level");
 }
 
 /*
- *
  * The post_config_humidity_handler function handles POST requests to update the ideal humidity range
  *
  * httpd_req_t *req:    Pointer to the received HTTP request
@@ -461,18 +438,10 @@ static esp_err_t post_config_light_level_handler(httpd_req_t *req) {
  * returns:             e.g. ESP_OK on success or ESP_FAIL on failed read from request body
  */
 static esp_err_t post_config_humidity_handler(httpd_req_t *req) {
-    esp_err_t ret;
-
-    if ((ret = receive_and_parse_data(req, &range_config.humidity_min, &range_config.humidity_max, "humidity")) !=
-        ESP_OK) {
-        return ret;
-    }
-
-    return ret;
+    return receive_and_parse_data(req, &range_config.humidity_min, &range_config.humidity_max, "humidity");
 }
 
 /*
- *
  * The post_config_moisture_handler function handles POST requests to update the ideal moisture range
  *
  * httpd_req_t *req:    pointer to the received HTTP request
@@ -480,18 +449,11 @@ static esp_err_t post_config_humidity_handler(httpd_req_t *req) {
  * returns:             e.g. ESP_OK on success or ESP_FAIL on failed read from request body
  */
 static esp_err_t post_config_moisture_handler(httpd_req_t *req) {
-    esp_err_t ret;
-
-    if ((ret = receive_and_parse_data(req, &range_config.moisture_min, &range_config.moisture_max, "moisture")) !=
-        ESP_OK) {
-        return ret;
-    }
-
-    return ret;
+    return receive_and_parse_data(req, &range_config.moisture_min, &range_config.moisture_max, "moisture");
 }
+
 /* End of handler functions */
 /* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
-
 
 /* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
 /* Start of URI configs */
@@ -555,7 +517,7 @@ static httpd_uri_t uri_post_config_moisture_level = {
 /* End of URI config */
 /* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
 
-/* Start of webserver and registering handlers */
+/* Starts the webserver and registers handlers */
 static httpd_handle_t start_webserver() {
     ESP_LOGI(WEBSERVER_TAG, "Starting server");
     /* Generate default configuration */
@@ -577,14 +539,11 @@ static httpd_handle_t start_webserver() {
     }
     return server;
 }
+
 /* End of Webserver section*/
 /* ------------------------------------------------------------------------------------------------------------------ */
 
-
-/*
- * The update_sensor_data function tries to update the sensor data and also calls the update_oled function to update the
- * display accordingly
- */
+/* Updates all sensor data and sets the values in sensor_data struct accordingly */
 static void update_sensor_data() {
     bme680_values_float_t values;
 
@@ -623,23 +582,25 @@ static void update_sensor_data() {
  *
  * notes:               _Noreturn tells the compiler that the function should never return and makes it act accordingly
  */
-
 static _Noreturn void water_plant() {
-    // Wait 5 minutes before checking the pump for the first time to make sure the hardware is set up correctly.
+    ESP_LOGI(PUMP_TAG, "Pump task started!");
+    ESP_LOGI(PUMP_TAG, "Waiting for 5 minutes before checking soil moisture levels "
+                       "to give you enough time to set the hardware up correctly.");
+
+    /* Wait 5 minutes before checking the pump for the first time to make sure the hardware is set up correctly. */
     vTaskDelay(pdMS_TO_TICKS(5 * 60000));
 
     while (1) {
-        int ideal = (int) roundf(
-                range_config.moisture_min + (((float) (range_config.moisture_max - range_config.moisture_min)) / 2));
         ESP_LOGI(PUMP_TAG, "Checking if plant needs watering...");
         /* Update sensor data for an accurate check */
         update_sensor_data();
 
-        ESP_LOGI(PUMP_TAG, "Measured soil moisture: %d %%; Ideal soil moisture: %d %%", sensor_data.moisture, ideal);
-        if (sensor_data.moisture < ideal) {
+        ESP_LOGI(PUMP_TAG, "Measured soil moisture: %d %%; Minimum set soil moisture: %d %%", sensor_data.moisture,
+                 range_config.moisture_min);
+        if (sensor_data.moisture < range_config.moisture_min) {
             ESP_LOGI(PUMP_TAG, "Plant needs watering! Starting pump for %d seconds...",
                      pump_config.pump_watering_time_ms / 1000);
-            /* activate the water pump by setting the GPIO-level to ON for the specified pump time then turn OFF again*/
+            /* Activate the water pump by setting the GPIO-level to ON for the specified pump time then turn OFF again*/
             gpio_set_level(PUMP_GPIO, GPIO_ON);
             vTaskDelay(pdMS_TO_TICKS(pump_config.pump_watering_time_ms));
             ESP_LOGI(PUMP_TAG, "Turning pump off and giving the water some time to settle...");
@@ -648,13 +609,13 @@ static _Noreturn void water_plant() {
             ESP_LOGI(PUMP_TAG, "Plant doesn't need to be watered right now.");
 
         ESP_LOGI(PUMP_TAG, "Rechecking soil moisture in %d minutes", pump_config.recheck_time_ms / 60000);
-        /* Check */
+        /* Wait the configured amount of time before rechecking again */
         vTaskDelay(pdMS_TO_TICKS(pump_config.recheck_time_ms));
     }
 }
 
 static void bme680_init() {
-    // init the sensor with slave address BME680_I2C_ADDRESS_1 connected to I2C_BUS.
+    /* Init the sensor with default slave address connected to I2C_BUS. */
     sensor = bme680_init_sensor(I2C_BUS, BME680_I2C_ADDRESS_1, 0);
 
     if (sensor) {
@@ -662,10 +623,10 @@ static void bme680_init() {
 
         // Changes the oversampling rates to 4x oversampling for temperature
         // and 2x oversampling for humidity. Pressure measurement is skipped.
-        bme680_set_oversampling_rates(sensor, osr_4x, osr_none, osr_2x);
+        // bme680_set_oversampling_rates(sensor, osr_4x, osr_none, osr_2x);
 
         // Change the IIR filter size for temperature and pressure to 7.
-        bme680_set_filter_size(sensor, iir_size_7);
+        // bme680_set_filter_size(sensor, iir_size_7);
 
         // Change the heater profile 0 to 200 degree Celcius for 100 ms.
         // bme680_set_heater_profile(sensor, 0, 200, 100);
@@ -674,7 +635,10 @@ static void bme680_init() {
 }
 
 static void pump_init() {
+    /* Set pump GPIO to output mode */
     gpio_set_direction(PUMP_GPIO, GPIO_MODE_OUTPUT);
+
+    /* Make sure the pump is turned off on start */
     gpio_set_level(PUMP_GPIO, GPIO_OFF);
 }
 
@@ -723,7 +687,7 @@ void app_main() {
 
     /*  TASK CREATION  */
     if (sensor) {
-        /* creates a Task that runs in a separate execution context */
+        /* creates a Task that periodically checks if the plant needs watering */
         xTaskCreate(water_plant, "water_plant", TASK_STACK_DEPTH, NULL, 2, NULL);
     } else
         ESP_LOGE(MAIN_TAG, "Could not initialize BME680 sensor");
