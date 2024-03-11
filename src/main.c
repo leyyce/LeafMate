@@ -85,8 +85,6 @@ by Leya Wehner and Julian Frank\n"
 
 #define PUMP_GPIO 26
 
-#define OLED_BUFF_SIZE 4
-#define OLED_TXT_BUFF_SIZE 128
 #define POST_REQUEST_BUFF_SIZE 128
 #define JSON_BUFF_INCREASE 512
 
@@ -616,6 +614,7 @@ static void update_sensor_data() {
         }
     }
 }
+
 /*
  * The water_plant function periodically checks if the plant needs watering and pumps water to the plant accordingly.
  * The function also updates the sensor data beforehand make the check as accurate as possible
@@ -638,7 +637,8 @@ static _Noreturn void water_plant() {
 
         ESP_LOGI(PUMP_TAG, "Measured soil moisture: %d %%; Ideal soil moisture: %d %%", sensor_data.moisture, ideal);
         if (sensor_data.moisture < ideal) {
-            ESP_LOGI(PUMP_TAG, "Plant needs watering! Starting pump for %d seconds...", pump_config.pump_watering_time_ms / 1000);
+            ESP_LOGI(PUMP_TAG, "Plant needs watering! Starting pump for %d seconds...",
+                     pump_config.pump_watering_time_ms / 1000);
             /* activate the water pump by setting the GPIO-level to ON for the specified pump time then turn OFF again*/
             gpio_set_level(PUMP_GPIO, GPIO_ON);
             vTaskDelay(pdMS_TO_TICKS(pump_config.pump_watering_time_ms));
@@ -676,35 +676,6 @@ static void bme680_init() {
 static void pump_init() {
     gpio_set_direction(PUMP_GPIO, GPIO_MODE_OUTPUT);
     gpio_set_level(PUMP_GPIO, GPIO_OFF);
-}
-
-/*
- *
- * Formats a single sensor value in a given format string
- *
- *  char *format_str:
- *
- *  int data: Integer value that will be formatted into the format string.
- *
- *  char *buff: pointer to a buffer where the formatted string will be stored
- *
- *  notes: snprintf writes the sensor data string into the buffer
- */
-static inline void sensor_val_to_string(char *format_str, int data, char *buff) {
-    snprintf(buff, OLED_TXT_BUFF_SIZE, format_str, data);
-}
-
-/*
- *
- * Formats the sensor data values into strings by passing them to the helper function sensor_val_to_string
- *
- *  char buff[static 4] [OLED_TXT_BUFF_SIZE]:   2D-Array with exactly 4 Elements
- */
-static inline void sensor_data_to_string(char buff[static 4][OLED_TXT_BUFF_SIZE]) {
-    sensor_val_to_string("Temperature:%d°C", sensor_data.temperature, buff[0]);
-    sensor_val_to_string("Light Level:%dlux", sensor_data.light_level, buff[1]);
-    sensor_val_to_string("Humidity:%d%%", sensor_data.humidity, buff[2]);
-    sensor_val_to_string("Moisture:%d%%", sensor_data.moisture, buff[3]);
 }
 
 void app_main() {
