@@ -709,11 +709,6 @@ void app_main() {
     /* Start the ESP-Webserver */
     start_webserver();
 
-    /* Setting the baud rate of our Universal Asynchronous Receiver/Transmitter to the same as our  */
-    // uart_set_baud(0, 115200);
-    /* Give the UART some time to settle */
-    vTaskDelay(1);
-
     /* Initializing the I2C-BUS-Interfaces*/
     i2c_init(I2C_BUS, I2C_SCL_PIN, I2C_SDA_PIN, I2C_FREQ);
 
