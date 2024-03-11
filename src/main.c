@@ -308,6 +308,9 @@ static esp_err_t receive_and_parse_data(httpd_req_t *req, int *min_val, int *max
         /* Update min and max values based on the received user input */
         *min_val = strtol(temp_min_str, NULL, 10);
         *max_val = strtol(temp_max_str, NULL, 10);
+
+        ESP_LOGI(WEBSERVER_TAG, "Config updated successfully => %s_min = %d and %s_max = %d.", kind, *min_val, kind,
+                 *max_val);
     }
 
     /* Send a response back to the client */
@@ -619,17 +622,9 @@ static void bme680_init() {
     sensor = bme680_init_sensor(I2C_BUS, BME680_I2C_ADDRESS_1, 0);
 
     if (sensor) {
-        /** -- SENSOR CONFIGURATION --- */
+        /* -- SENSOR CONFIGURATION --- */
 
-        // Changes the oversampling rates to 4x oversampling for temperature
-        // and 2x oversampling for humidity. Pressure measurement is skipped.
-        // bme680_set_oversampling_rates(sensor, osr_4x, osr_none, osr_2x);
-
-        // Change the IIR filter size for temperature and pressure to 7.
-        // bme680_set_filter_size(sensor, iir_size_7);
-
-        // Change the heater profile 0 to 200 degree Celcius for 100 ms.
-        // bme680_set_heater_profile(sensor, 0, 200, 100);
+        /* Disables the heater because it's only used for gas measurements that we don't take. */
         bme680_use_heater_profile(sensor, BME680_HEATER_NOT_USED);
     }
 }
