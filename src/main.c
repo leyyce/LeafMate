@@ -31,7 +31,6 @@
 #include "config.h"
 #include "moisture_sensor.h"
 #include "tsl2561.h"
-#include "ssd1306.h"
 
 
 #define GREETING "\
@@ -195,7 +194,6 @@ static bme680_sensor_t *sensor = 0;
 
 /* Declaring functions so that they can be used before they are implemented */
 static void update_sensor_data();
-static void update_oled();
 
 
 /* ------------------------------------------------------------------------------------------------------------------ */
@@ -615,9 +613,6 @@ static void update_sensor_data() {
             sensor_data.light_level = (int) roundf(lux);
             sensor_data.humidity = (int) roundf(values.humidity);
             sensor_data.moisture = moisture;
-
-            /* update the oled screen to use the recent values */
-            update_oled();
         }
     }
 }
@@ -683,13 +678,6 @@ static void pump_init() {
     gpio_set_level(PUMP_GPIO, GPIO_OFF);
 }
 
-static void oled_init() {
-    ssd1306_128x64_i2c_initEx(-1 , -1 , 0);
-    ssd1306_clearScreen();
-    ssd1306_setFixedFont(ssd1306xled_font8x16);
-    ssd1306_printFixed(0,0,"Awaiting Update ...",STYLE_NORMAL);
-}
-
 /*
  *
  * Formats a single sensor value in a given format string
@@ -718,30 +706,6 @@ static inline void sensor_data_to_string(char buff[static 4][OLED_TXT_BUFF_SIZE]
     sensor_val_to_string("Humidity:%d%%", sensor_data.humidity, buff[2]);
     sensor_val_to_string("Moisture:%d%%", sensor_data.moisture, buff[3]);
 }
-
-/*
- *
- * Updates the oled screen
- *
- * notes: may need to be called twice to fully clear the Screen
- */
-static void update_oled() {
-    /* clearing screen */
-    ssd1306_clearScreen();
-    ssd1306_clearScreen();
-
-    char buff[OLED_BUFF_SIZE][OLED_TXT_BUFF_SIZE];
-
-    /* read the sensor values and pass them to the buff array */
-    sensor_data_to_string(buff);
-
-    /* Print each line on the oled via a for-loop on the array and change the y coordinate to start in the next line */
-    for (int i = 0; i < OLED_BUFF_SIZE; i++) {
-        ssd1306_printFixed(0, i * 16, buff[i], STYLE_NORMAL);
-    }
-
-}
-
 
 void app_main() {
     puts(GREETING);
@@ -791,16 +755,8 @@ void app_main() {
     /* Initialize the pump */
     pump_init();
 
-    /* Initialize the oled display */
-    oled_init();
-
     /*  TASK CREATION  */
     if (sensor) {
-        /* Needs to be called twice for whatever reason,
-         * otherwise the oled will not update before visiting the website or after 5 minutes */
-        update_sensor_data();
-        update_sensor_data();
-
         /* creates a Task that runs in a separate execution context */
         xTaskCreate(water_plant, "water_plant", TASK_STACK_DEPTH, NULL, 2, NULL);
     } else
