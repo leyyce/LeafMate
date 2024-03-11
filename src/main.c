@@ -281,7 +281,13 @@ static esp_err_t receive_and_parse_data(httpd_req_t *req, int *min_val, int *max
     char buffer[POST_REQUEST_BUFF_SIZE + 1];
 
     ESP_LOGI(WEBSERVER_TAG, "Content length: %d", content_length);
-    if (content_length > POST_REQUEST_BUFF_SIZE) return ESP_FAIL;
+    if (content_length > POST_REQUEST_BUFF_SIZE) {
+        ESP_LOGE(WEBSERVER_TAG, "Request body is to long. %s config values not updated.", kind);
+
+        httpd_resp_set_status(req, "400");
+        httpd_resp_send(req, "Request body is to long!", HTTPD_RESP_USE_STRLEN);
+        return ESP_FAIL;
+    }
 
     /* Check if there is any data to read */
     if (content_length > 0) {
@@ -291,7 +297,7 @@ static esp_err_t receive_and_parse_data(httpd_req_t *req, int *min_val, int *max
         if (read_len <= 0) {
             /* Handle error */
             httpd_resp_send_500(req);
-            ESP_LOGE(WEBSERVER_TAG, "Failed to read from request body. %s min and max values not updated.", kind);
+            ESP_LOGE(WEBSERVER_TAG, "Failed to read from request body. %s config values not updated.", kind);
             return ESP_FAIL;
         }
 
@@ -305,20 +311,42 @@ static esp_err_t receive_and_parse_data(httpd_req_t *req, int *min_val, int *max
         char *temp_min_str = strtok(buffer, ":");
         char *temp_max_str = strtok(NULL, ":");
 
-        /* Update min and max values based on the received user input */
-        *min_val = strtol(temp_min_str, NULL, 10);
-        *max_val = strtol(temp_max_str, NULL, 10);
+        if (temp_min_str && temp_max_str) {
+            /* Update min and max values based on the received user input */
+            char *min_end_ptr, *max_end_ptr;
 
-        ESP_LOGI(WEBSERVER_TAG, "Config updated successfully => %s_min=%d ; %s_max=%d", kind, *min_val, kind,
-                 *max_val);
+            int min_val_temp = strtol(temp_min_str, &min_end_ptr, 10);
+            int max_val_temp = strtol(temp_max_str, &max_end_ptr, 10);
+
+            if (! *min_end_ptr && ! *max_end_ptr) {
+
+                if (min_val_temp > max_val_temp) {
+                    ESP_LOGE(WEBSERVER_TAG, "%s_min can't be greater than %s_max. %s config values not updated!", kind, kind, kind);
+                    httpd_resp_set_status(req, "400");
+                    httpd_resp_send(req, "Min val can't be greater than max val. Request invalid!", HTTPD_RESP_USE_STRLEN);
+                    return ESP_FAIL;
+                }
+
+                *min_val = min_val_temp;
+                *max_val = max_val_temp;
+
+                ESP_LOGI(WEBSERVER_TAG, "Config updated successfully => %s_min=%d ; %s_max=%d", kind, *min_val, kind,
+                         *max_val);
+
+                /* Send a response back to the client */
+                httpd_resp_send(req, "Data received successfully", HTTPD_RESP_USE_STRLEN);
+                return ESP_OK;
+            } else
+                ESP_LOGE(WEBSERVER_TAG, "%s config values not updated as received data contains invalid characters!", kind);
+        } else
+            ESP_LOGE(WEBSERVER_TAG, "%s config not updated as received data is malformed!", kind);
     }
-
-    /* Send a response back to the client */
-    httpd_resp_send(req, "Data received successfully", HTTPD_RESP_USE_STRLEN);
-    return ESP_OK;
+    httpd_resp_set_status(req, "400");
+    httpd_resp_send(req, "Request body is invalid!", HTTPD_RESP_USE_STRLEN);
+    return ESP_FAIL;
 }
 
-static inline void send_html_response(httpd_req_t *req, const unsigned char *start, const unsigned char *end) {
+static void send_html_response(httpd_req_t *req, const unsigned char *start, const unsigned char *end) {
     /* Adds the header field for "Content-Encoding" to our http response so */
     httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
 
@@ -416,10 +444,12 @@ static esp_err_t get_range_data_handler(httpd_req_t *req) {
  *
  * httpd_req_t *req:    Pointer to the received HTTP request
  *
- * returns:             e.g. ESP_OK on success or ESP_FAIL on failed read from request body
+ * returns:             ESP_OK
  */
 static esp_err_t post_config_temperature_handler(httpd_req_t *req) {
-    return receive_and_parse_data(req, &range_config.temperature_min, &range_config.temperature_max, "temperature");
+    receive_and_parse_data(req, &range_config.temperature_min, &range_config.temperature_max, "temperature");
+
+    return ESP_OK;
 }
 
 /*
@@ -427,10 +457,12 @@ static esp_err_t post_config_temperature_handler(httpd_req_t *req) {
  *
  * httpd_req_t *req:    Pointer to the received HTTP request
  *
- * returns:             e.g. ESP_OK on success or ESP_FAIL on failed read from request body
+ * returns:             ESP_OK
  */
 static esp_err_t post_config_light_level_handler(httpd_req_t *req) {
-    return receive_and_parse_data(req, &range_config.light_level_min, &range_config.light_level_max, "light_level");
+    receive_and_parse_data(req, &range_config.light_level_min, &range_config.light_level_max, "light_level");
+
+    return ESP_OK;
 }
 
 /*
@@ -438,10 +470,12 @@ static esp_err_t post_config_light_level_handler(httpd_req_t *req) {
  *
  * httpd_req_t *req:    Pointer to the received HTTP request
  *
- * returns:             e.g. ESP_OK on success or ESP_FAIL on failed read from request body
+ * returns:             ESP_OK
  */
 static esp_err_t post_config_humidity_handler(httpd_req_t *req) {
-    return receive_and_parse_data(req, &range_config.humidity_min, &range_config.humidity_max, "humidity");
+    receive_and_parse_data(req, &range_config.humidity_min, &range_config.humidity_max, "humidity");
+
+    return ESP_OK;
 }
 
 /*
@@ -449,10 +483,12 @@ static esp_err_t post_config_humidity_handler(httpd_req_t *req) {
  *
  * httpd_req_t *req:    pointer to the received HTTP request
  *
- * returns:             e.g. ESP_OK on success or ESP_FAIL on failed read from request body
+ * returns:             ESP_OK
  */
 static esp_err_t post_config_moisture_handler(httpd_req_t *req) {
-    return receive_and_parse_data(req, &range_config.moisture_min, &range_config.moisture_max, "moisture");
+    receive_and_parse_data(req, &range_config.moisture_min, &range_config.moisture_max, "moisture");
+
+    return ESP_OK;
 }
 
 /* End of handler functions */
