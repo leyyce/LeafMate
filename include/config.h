@@ -32,7 +32,8 @@
 #define MOISTURE_SENSOR_DRY_VAL 2295
 #define MOISTURE_SENSOR_WET_VAL 1430
 
-
+// Defines weather the automatic watering via pump is activated on startup: 0 -> OFF ; 1 -> ON
+#define PUMP_TOGGLE_DEFAULT 0
 // Defines after what time the soil moisture should be rechecked for watering needs
 #define PUMP_RECHECK_TIME_MS 900000
 // Defines how long the pump will pump water when watering is needed

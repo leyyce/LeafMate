@@ -85,8 +85,8 @@ by Leya Wehner and Julian Frank\n"
 
 #define PUMP_GPIO 26
 
-#define POST_REQUEST_BUFF_SIZE 128
-#define JSON_BUFF_INCREASE 512
+#define POST_REQUEST_BUF_SIZE 128
+#define JSON_BUF_INCREASE 512
 
 /*
  * JSON-Object for sensor data
@@ -112,6 +112,10 @@ static const char *JSON_RANGE_DATA = "{\n"
                                      "\t\"moisture_min\": %d,\n"
                                      "\t\"moisture_max\": %d\n"
                                      "}\n";
+
+static const char *JSON_PUMP_STATUS_DATA = "{\n"
+                                           "\t\"pump_status\": %s\n"
+                                           "}\n";
 
 /* Pointers to the gzip compressed HTML files embedded in the firmware binary */
 extern const unsigned char index_html_gz_start[] asm("_binary_index_html_gz_start");
@@ -188,7 +192,10 @@ static pump_config_t pump_config = {
 static bool wifi_established;
 
 /* Pointer to bme680 sensor struct */
-static bme680_sensor_t *sensor = 0;
+static bme680_sensor_t *sensor = NULL;
+
+TaskHandle_t pump_task = NULL;
+bool pump_task_toggle = PUMP_TOGGLE_DEFAULT;
 
 /* Declaring functions so that they can be used before they are implemented */
 static void update_sensor_data();
@@ -258,6 +265,44 @@ static void wifi_init_sta() {
 /* ------------------------------------------------------------------------------------------------------------------ */
 /* Start of webserver section */
 
+static esp_err_t read_request_content(httpd_req_t *req, char *buffer, size_t buf_len, char *kind) {
+    /* Read the content length of the request */
+    size_t content_length = req->content_len;
+
+    ESP_LOGI(WEBSERVER_TAG, "Content length: %d", content_length);
+    if (content_length > POST_REQUEST_BUF_SIZE) {
+        ESP_LOGE(WEBSERVER_TAG, "Request body is to long. %s config values not updated.", kind);
+
+        httpd_resp_set_status(req, "400");
+        httpd_resp_send(req, "Request body is to long!", HTTPD_RESP_USE_STRLEN);
+        return ESP_FAIL;
+    }
+
+    /* Check if there is any data to read */
+    if (content_length > 0) {
+        /* Read the body of the POST request */
+        int read_len = httpd_req_recv(req, buffer, buf_len);
+
+        if (read_len <= 0) {
+            /* Handle error */
+            httpd_resp_send_500(req);
+            ESP_LOGE(WEBSERVER_TAG, "Failed to read from request body. %s config values not updated.", kind);
+            return ESP_FAIL;
+        }
+
+        /* Null-terminate the received data */
+        buffer[read_len] = '\0';
+
+        /* Print the received data to the console */
+        ESP_LOGI(WEBSERVER_TAG, "Received data: %s", buffer);
+
+        return ESP_OK;
+    }
+
+    ESP_LOGE(WEBSERVER_TAG, "Request body is empty. %s config values not updated.", kind);
+    return ESP_FAIL;
+}
+
 /*
  * The receive_and_parse_data function handles POST requests to the webserver
  *
@@ -274,46 +319,17 @@ static void wifi_init_sta() {
 static esp_err_t receive_and_parse_data(httpd_req_t *req, int *min_val, int *max_val, char *kind) {
     ESP_LOGI(WEBSERVER_TAG, "Handling %s config post request", kind);
 
-    /* Read the content length of the request */
-    size_t content_length = req->content_len;
-
     /* Buffer size + 1 to accommodate the null terminator */
-    char buffer[POST_REQUEST_BUFF_SIZE + 1];
+    char buffer[POST_REQUEST_BUF_SIZE + 1];
 
-    ESP_LOGI(WEBSERVER_TAG, "Content length: %d", content_length);
-    if (content_length > POST_REQUEST_BUFF_SIZE) {
-        ESP_LOGE(WEBSERVER_TAG, "Request body is to long. %s config values not updated.", kind);
-
-        httpd_resp_set_status(req, "400");
-        httpd_resp_send(req, "Request body is to long!", HTTPD_RESP_USE_STRLEN);
-        return ESP_FAIL;
-    }
-
-    /* Check if there is any data to read */
-    if (content_length > 0) {
-        /* Read the body of the POST request */
-        int read_len = httpd_req_recv(req, buffer, sizeof(buffer));
-
-        if (read_len <= 0) {
-            /* Handle error */
-            httpd_resp_send_500(req);
-            ESP_LOGE(WEBSERVER_TAG, "Failed to read from request body. %s config values not updated.", kind);
-            return ESP_FAIL;
-        }
-
-        /* Null-terminate the received data */
-        buffer[read_len] = '\0';
-
-        /* Print the received data to the console */
-        ESP_LOGI(WEBSERVER_TAG, "Received data: %s", buffer);
-
+    if (read_request_content(req, buffer, sizeof(buffer), kind) == ESP_OK) {
         /* Split received data at ':' */
         char *temp_min_str = strtok(buffer, ":");
         char *temp_max_str = strtok(NULL, ":");
 
+        /* Update min and max values based on the received user input */
         if (temp_min_str && temp_max_str) {
-            /* Update min and max values based on the received user input */
-            char *min_end_ptr, *max_end_ptr;
+            char *min_end_ptr = NULL, *max_end_ptr = NULL;
 
             int min_val_temp = strtol(temp_min_str, &min_end_ptr, 10);
             int max_val_temp = strtol(temp_max_str, &max_end_ptr, 10);
@@ -406,13 +422,13 @@ static esp_err_t get_sensor_readout_handler(httpd_req_t *req) {
     ESP_LOGI(WEBSERVER_TAG, "Handling sensor readout request");
     httpd_resp_set_type(req, "application/json");
 
-    char buff[strlen(JSON_SENSOR_DATA) + JSON_BUFF_INCREASE];
+    char buf[strlen(JSON_SENSOR_DATA) + JSON_BUF_INCREASE];
 
     update_sensor_data();
-    sprintf(buff, JSON_SENSOR_DATA, sensor_data.temperature, sensor_data.light_level, sensor_data.humidity,
+    sprintf(buf, JSON_SENSOR_DATA, sensor_data.temperature, sensor_data.light_level, sensor_data.humidity,
             sensor_data.moisture);
 
-    httpd_resp_send(req, buff, HTTPD_RESP_USE_STRLEN);
+    httpd_resp_send(req, buf, HTTPD_RESP_USE_STRLEN);
     return ESP_OK;
 }
 
@@ -427,15 +443,34 @@ static esp_err_t get_range_data_handler(httpd_req_t *req) {
     ESP_LOGI(WEBSERVER_TAG, "Handling range data request");
     httpd_resp_set_type(req, "application/json");
 
-    char buff[strlen(JSON_RANGE_DATA) + JSON_BUFF_INCREASE];
+    char buf[strlen(JSON_RANGE_DATA) + JSON_BUF_INCREASE];
 
-    sprintf(buff, JSON_RANGE_DATA,
+    sprintf(buf, JSON_RANGE_DATA,
             range_config.temperature_min, range_config.temperature_max,
             range_config.light_level_min, range_config.light_level_max,
             range_config.humidity_min, range_config.humidity_max,
             range_config.moisture_min, range_config.moisture_max);
 
-    httpd_resp_send(req, buff, HTTPD_RESP_USE_STRLEN);
+    httpd_resp_send(req, buf, HTTPD_RESP_USE_STRLEN);
+    return ESP_OK;
+}
+
+/*
+ * The post_config_temperature_handler replies to the GET request with the JSON formatted range data
+ *
+ * httpd_req_t *req:    Pointer to the received HTTP request
+ *
+ * returns:             ESP_OK
+ */
+static esp_err_t get_pump_status_handler(httpd_req_t *req) {
+    ESP_LOGI(WEBSERVER_TAG, "Handling pump status request");
+    httpd_resp_set_type(req, "application/json");
+
+    char buf[strlen(JSON_PUMP_STATUS_DATA) + JSON_BUF_INCREASE];
+
+    sprintf(buf, JSON_PUMP_STATUS_DATA, pump_task_toggle ? "true" : "false");
+
+    httpd_resp_send(req, buf, HTTPD_RESP_USE_STRLEN);
     return ESP_OK;
 }
 
@@ -491,6 +526,37 @@ static esp_err_t post_config_moisture_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
+static esp_err_t post_config_pump_status(httpd_req_t *req) {
+    ESP_LOGI(WEBSERVER_TAG, "Handling pump toggle config post request");
+
+    /* Buffer size + 1 to accommodate the null terminator */
+    char buffer[POST_REQUEST_BUF_SIZE + 1];
+
+    if (read_request_content(req, buffer, sizeof(buffer), "pump_status") == ESP_OK) {
+        char *end_ptr = NULL;
+
+        int temp = strtol(buffer, &end_ptr, 2);
+
+        if (! *end_ptr) {
+            pump_task_toggle = temp;
+
+            if (pump_task_toggle) vTaskResume(pump_task);
+
+            ESP_LOGI(WEBSERVER_TAG, "Pump task %s successfully!", pump_task_toggle ? "resumed" : "suspended");
+
+            /* Send a response back to the client */
+            httpd_resp_send(req, "Data received successfully", HTTPD_RESP_USE_STRLEN);
+        } else {
+            ESP_LOGE(WEBSERVER_TAG, "Pump task config value not updated as received data contains invalid characters!");
+        }
+    }
+
+    httpd_resp_set_status(req, "400");
+    httpd_resp_send(req, "Request body is invalid!", HTTPD_RESP_USE_STRLEN);
+
+    return ESP_OK;
+}
+
 /* End of handler functions */
 /* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
 
@@ -525,6 +591,13 @@ static httpd_uri_t uri_get_range_data = {
         .user_ctx = NULL
 };
 
+static httpd_uri_t uri_get_pump_status = {
+        .uri = "/api/v1/pump",
+        .method = HTTP_GET,
+        .handler = get_pump_status_handler,
+        .user_ctx = NULL
+};
+
 static httpd_uri_t uri_post_config_temperature = {
         .uri = "/api/v1/config/temperature",
         .method = HTTP_POST,
@@ -539,17 +612,24 @@ static httpd_uri_t uri_post_config_light_level = {
         .user_ctx = NULL
 };
 
-static httpd_uri_t uri_post_config_humidity_level = {
+static httpd_uri_t uri_post_config_humidity = {
         .uri = "/api/v1/config/humidity",
         .method = HTTP_POST,
         .handler = post_config_humidity_handler,
         .user_ctx = NULL
 };
 
-static httpd_uri_t uri_post_config_moisture_level = {
+static httpd_uri_t uri_post_config_moisture = {
         .uri = "/api/v1/config/moisture",
         .method = HTTP_POST,
         .handler = post_config_moisture_handler,
+        .user_ctx = NULL
+};
+
+static httpd_uri_t uri_post_config_pump_status = {
+        .uri = "/api/v1/config/pump",
+        .method = HTTP_POST,
+        .handler = post_config_pump_status,
         .user_ctx = NULL
 };
 
@@ -560,6 +640,7 @@ static httpd_uri_t uri_post_config_moisture_level = {
 static httpd_handle_t start_webserver() {
     /* Generate default configuration */
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+    config.max_uri_handlers = 10;
     /* Empty handle to esp_http_server */
     httpd_handle_t server = NULL;
     /* Start the httpd server */
@@ -569,15 +650,17 @@ static httpd_handle_t start_webserver() {
         httpd_register_uri_handler(server, &uri_get_config);
         httpd_register_uri_handler(server, &uri_get_sensor_readout);
         httpd_register_uri_handler(server, &uri_get_range_data);
+        httpd_register_uri_handler(server, &uri_get_pump_status);
 
         httpd_register_uri_handler(server, &uri_post_config_temperature);
         httpd_register_uri_handler(server, &uri_post_config_light_level);
-        httpd_register_uri_handler(server, &uri_post_config_humidity_level);
-        httpd_register_uri_handler(server, &uri_post_config_moisture_level);
+        httpd_register_uri_handler(server, &uri_post_config_humidity);
+        httpd_register_uri_handler(server, &uri_post_config_moisture);
+        httpd_register_uri_handler(server, &uri_post_config_pump_status);
 
-        ESP_LOGI(WEBSERVER_TAG, "Server started successfully!");
+        ESP_LOGI(WEBSERVER_TAG, "Web server started successfully!");
     } else {
-        ESP_LOGE(WEBSERVER_TAG, "Failed to start webserver. Resetting device...");
+        ESP_LOGE(WEBSERVER_TAG, "Failed to start web server. Resetting device...");
         esp_restart();
     }
     return server;
@@ -627,13 +710,15 @@ static void update_sensor_data() {
  */
 static _Noreturn void water_plant() {
     ESP_LOGI(PUMP_TAG, "Pump task started successfully!");
-    ESP_LOGI(PUMP_TAG, "Waiting for 5 minutes before checking soil moisture levels "
-                       "to give you enough time to set the hardware up correctly.");
 
-    /* Wait 5 minutes before checking the pump for the first time to make sure the hardware is set up correctly. */
-    vTaskDelay(pdMS_TO_TICKS(5 * 60000));
+    if (!pump_task_toggle)
+        ESP_LOGI(PUMP_TAG, "Pump task will be suspended now because automatic watering is turned off.\n"
+                           "You can turn watering on until next startup via the webinterface or "
+                           "enable it permanently in the config file.");
 
-    while (1) {
+    while (true) {
+        if (!pump_task_toggle) vTaskSuspend(NULL);
+
         ESP_LOGI(PUMP_TAG, "Checking if plant needs watering...");
         /* Update sensor data for an accurate check */
         update_sensor_data();
@@ -650,10 +735,11 @@ static _Noreturn void water_plant() {
             gpio_set_level(PUMP_GPIO, GPIO_OFF);
         } else
             ESP_LOGI(PUMP_TAG, "Plant doesn't need to be watered right now.");
-
-        ESP_LOGI(PUMP_TAG, "Rechecking soil moisture in %d minutes", pump_config.recheck_time_ms / 60000);
-        /* Wait the configured amount of time before rechecking again */
-        vTaskDelay(pdMS_TO_TICKS(pump_config.recheck_time_ms));
+        if (pump_task_toggle) {
+            ESP_LOGI(PUMP_TAG, "Rechecking soil moisture in %d minutes", pump_config.recheck_time_ms / 60000);
+            /* Wait the configured amount of time before rechecking again */
+            vTaskDelay(pdMS_TO_TICKS(pump_config.recheck_time_ms));
+        }
     }
 }
 
@@ -706,7 +792,7 @@ void app_main() {
     while (!wifi_established) { vTaskDelay(1); }
 
     /* Start the ESP-Webserver */
-    ESP_LOGI(MAIN_TAG, "Starting server...");
+    ESP_LOGI(MAIN_TAG, "Starting web server...");
     start_webserver();
 
     /* Initializing the I2C-BUS-Interfaces*/
@@ -725,7 +811,7 @@ void app_main() {
     if (sensor) {
         /* creates a Task that periodically checks if the plant needs watering */
         ESP_LOGI(MAIN_TAG, "Starting pump task...");
-        xTaskCreate(water_plant, "water_plant", TASK_STACK_DEPTH, NULL, 2, NULL);
+        xTaskCreate(water_plant, "water_plant", TASK_STACK_DEPTH, NULL, 2, &pump_task);
     } else
         ESP_LOGE(MAIN_TAG, "Could not initialize BME680 sensor");
 #endif //CONFIG_MODE
