@@ -22,12 +22,17 @@
 #define WIFI_SSID "Your WiFi SSID"
 #define WIFI_PASS "your-wifi-pass"
 
+// Defines weather SSL encryption should be used for the webinterface. 0 -> OFF ; 1 -> ON
+// It is highly recommended generate your own private key and certificate to replace the example ones that are shipped
+// with LeafMate by running e.g.
+// > openssl req -newkey rsa:2048 -nodes -keyout leafmate_prvtkey.pem -x509 -days 3650 -out leafmate_servercert.pem -subj "/CN=LeafMate"
+// After that replace them with the ones contained in src/certs/
+#define WEBSERVER_USE_SSL_ENCRYPTION 1
 
 // Uncomment the line below to start in config mode.
 // Config mode is used to configure the moisture sensor for correct measurements.
 // The MOISTURE_SENSOR_DRY_VAL and MOISTURE_SENSOR_WET_VAL should be set according to your measurements done in config mode.
 // Measure once in air and once with the sensor submerged in water and set values accordingly.
-
 // #define CONFIG_MODE
 #define MOISTURE_SENSOR_DRY_VAL 2295
 #define MOISTURE_SENSOR_WET_VAL 1430
