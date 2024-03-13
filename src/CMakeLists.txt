@@ -9,5 +9,3 @@ idf_component_register(
 
 target_add_binary_data(${COMPONENT_TARGET} "web/index.html.gz" BINARY)
 target_add_binary_data(${COMPONENT_TARGET} "web/config.html.gz" BINARY)
-target_add_binary_data(${COMPONENT_TARGET} "certs/leafmate_prvtkey.pem" TEXT)
-target_add_binary_data(${COMPONENT_TARGET} "certs/leafmate_servercert.pem" TEXT)
