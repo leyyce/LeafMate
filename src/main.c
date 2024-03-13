@@ -20,7 +20,7 @@
 #include <sys/cdefs.h>
 
 #include <hal/adc_types.h>
-#include <esp_http_server.h>
+#include <esp_https_server.h>
 #include <esp_event.h>
 #include <esp_wifi.h>
 #include <esp_err.h>
@@ -122,6 +122,11 @@ extern const unsigned char index_html_gz_start[] asm("_binary_index_html_gz_star
 extern const unsigned char index_html_gz_end[] asm("_binary_index_html_gz_end");
 extern const unsigned char config_html_gz_start[] asm("_binary_config_html_gz_start");
 extern const unsigned char config_html_gz_end[] asm("_binary_config_html_gz_end");
+
+extern const unsigned char prvtkey_start[] asm("_binary_leafmate_prvtkey_pem_start");
+extern const unsigned char prvtkey_end[] asm("_binary_leafmate_prvtkey_pem_end");
+extern const unsigned char servercert_start[] asm("_binary_leafmate_servercert_pem_start");
+extern const unsigned char servercert_end[] asm("_binary_leafmate_servercert_pem_end");
 
 /* Tags for the esp-log functions. Used for categorizing the logs */
 static const char *MAIN_TAG = "Main";
@@ -639,12 +644,21 @@ static httpd_uri_t uri_post_config_pump_status = {
 /* Starts the webserver and registers handlers */
 static httpd_handle_t start_webserver() {
     /* Generate default configuration */
-    httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.max_uri_handlers = 10;
+    httpd_ssl_config_t config = HTTPD_SSL_CONFIG_DEFAULT();
+    config.httpd.max_uri_handlers = 10;
+#if WEBSERVER_USE_SSL_ENCRYPTION
+    config.servercert = servercert_start;
+    config.servercert_len = servercert_end - servercert_start;
+    config.prvtkey_pem = prvtkey_start;
+    config.prvtkey_len = prvtkey_end - prvtkey_start;
+#else
+    config.transport_mode = HTTPD_SSL_TRANSPORT_INSECURE;
+#endif
     /* Empty handle to esp_http_server */
     httpd_handle_t server = NULL;
+
     /* Start the httpd server */
-    if (httpd_start(&server, &config) == ESP_OK) {
+    if (httpd_ssl_start(&server, &config) == ESP_OK) {
         /* Register URI handlers */
         httpd_register_uri_handler(server, &uri_get_root);
         httpd_register_uri_handler(server, &uri_get_config);
