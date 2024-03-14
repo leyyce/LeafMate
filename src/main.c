@@ -25,6 +25,7 @@
 #include <esp_wifi.h>
 #include <esp_err.h>
 #include <esp_log.h>
+#include <freertos/semphr.h>
 #include <nvs_flash.h>
 
 #include "bme680.h"
@@ -32,6 +33,7 @@
 #include "moisture_sensor.h"
 #include "tsl2561.h"
 
+#define xQueueHandle QueueHandle_t
 
 #define GREETING "\
 \n\n Welcome to\n \
@@ -166,6 +168,8 @@ static sensor_data_t sensor_data = {
         .humidity = 0,
         .moisture = 0,
 };
+
+SemaphoreHandle_t sensor_data_mutex = NULL;
 
 /* Initialising a sensor range object with the default values set in the config */
 static range_config_t range_config = {
@@ -425,8 +429,11 @@ static esp_err_t get_sensor_readout_handler(httpd_req_t *req) {
     char buf[strlen(JSON_SENSOR_DATA) + JSON_BUF_INCREASE];
 
     update_sensor_data();
+
+    xSemaphoreTake(sensor_data_mutex, portMAX_DELAY);
     sprintf(buf, JSON_SENSOR_DATA, sensor_data.temperature, sensor_data.light_level, sensor_data.humidity,
             sensor_data.moisture);
+    xSemaphoreGive(sensor_data_mutex);
 
     httpd_resp_send(req, buf, HTTPD_RESP_USE_STRLEN);
     return ESP_OK;
@@ -671,11 +678,11 @@ static httpd_handle_t start_webserver() {
 
 /* Updates all sensor data and sets the values in sensor_data struct accordingly */
 static void update_sensor_data() {
+    xSemaphoreTake(sensor_data_mutex, portMAX_DELAY);
     bme680_values_float_t values;
 
     /* Gets an approximation of the time the measurement will take  */
     uint32_t duration = bme680_get_measurement_duration(sensor);
-
     /* Start a measurement of humidity and temperature via the bme680 sensor */
     if (bme680_force_measurement(sensor)) {
         /* Passive waiting for the duration of the measurement
@@ -698,6 +705,7 @@ static void update_sensor_data() {
             sensor_data.moisture = moisture;
         }
     }
+    xSemaphoreGive(sensor_data_mutex);
 }
 
 /*
@@ -723,9 +731,13 @@ static _Noreturn void water_plant() {
         /* Update sensor data for an accurate check */
         update_sensor_data();
 
-        ESP_LOGI(PUMP_TAG, "Measured soil moisture: %d %%; Minimum set soil moisture: %d %%", sensor_data.moisture,
+        xSemaphoreTake(sensor_data_mutex, portMAX_DELAY);
+        int measured_moisture = sensor_data.moisture;
+        xSemaphoreGive(sensor_data_mutex);
+
+        ESP_LOGI(PUMP_TAG, "Measured soil moisture: %d %%; Minimum set soil moisture: %d %%", measured_moisture,
                  range_config.moisture_min);
-        if (sensor_data.moisture < range_config.moisture_min) {
+        if (measured_moisture < range_config.moisture_min) {
             ESP_LOGI(PUMP_TAG, "Plant needs watering! Starting pump for %d seconds...",
                      pump_config.pump_watering_time_ms / 1000);
             /* Activate the water pump by setting the GPIO-level to ON for the specified pump time then turn OFF again*/
@@ -785,6 +797,10 @@ void app_main() {
     }
     ESP_ERROR_CHECK(ret);
 
+    if (!(sensor_data_mutex = xSemaphoreCreateMutex())) {
+        ESP_LOGE(WEBSERVER_TAG, "Couldn't allocate memory for the sensor data mutex. Resetting device...");
+        esp_restart();
+    }
 
     /* Initializing WiFi-Connection */
     wifi_init_sta();
